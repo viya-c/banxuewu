@@ -9,7 +9,7 @@ compatibility_date = "2024-11-01"
 binding = "DB"
 database_name = "xingguang"
 # 执行 `wrangler d1 create xingguang` 后，把返回的 id 填到下面（保留引号）
-database_id = "REPLACE_WITH_D1_ID"
+database_id = "41e2b74a-0405-4345-bb42-bbacd8d62c9c"
 
 # ---- 实时同步 Durable Object：每个家庭一个实例，持有在线 WebSocket 并广播 ----
 [[durable_objects.bindings]]
