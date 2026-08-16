@@ -43,7 +43,7 @@
   }
 
   /* 端口：语义与 worker.js handleAPI 一致，但操作本地 state 并持久化到 GitHub */
-  async function ghApi(path, opt) {
+  async function ghApi(path, opt = {}) {
     if (!S.data) {
       let st = await ghGet();
       if (!st || typeof st !== 'object') st = defaultData();
