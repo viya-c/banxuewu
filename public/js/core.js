@@ -172,8 +172,6 @@ function toast(msg, ms = 2000) {
 
 const pad2 = n => String(n).padStart(2, '0');
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
-/** 本地日期转 YYYY-MM-DD（避免 toISOString 的 UTC 偏移导致跨天错位） */
-const ymd = d => { const x = (d instanceof Date) ? d : new Date(d); if (isNaN(x)) return ''; return `${x.getFullYear()}-${pad2(x.getMonth() + 1)}-${pad2(x.getDate())}`; };
 const nowHM = () => { const d = new Date(); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
 const toMin = hm => { if (!hm) return 0; const [h, m] = String(hm).split(':').map(Number); return h * 60 * 1 + (m || 0); };
 const minToHM = m => `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`;
