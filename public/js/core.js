@@ -76,11 +76,11 @@ const emojiOf = s => SUBJ_EMOJI[s] || '📌';
 
 /* ---------- 请求 ---------- */
 // API 基地址：本地运行（node server.js）走同源，留空即可；
-// 部署到 GitHub Pages 时，由 js/config.js 选择 window.__GITHUB（仓库当数据库）或 window.__LOCAL（纯本地）。
+// 部署到 GitHub Pages + Cloudflare Workers 时，由 public/js/config.js 设置 window.__API_BASE。
 const API_BASE = (function () {
   if (window.__API_BASE) return String(window.__API_BASE).replace(/\/+$/, '');
-  if (location.hostname.endsWith('github.io') &amp;&amp; !window.__GITHUB &amp;&amp; !window.__LOCAL) {
-    console.warn('[星光伴学屋] 运行在 GitHub Pages，但 config.js 未配置后端（缺少 window.__GITHUB 或 window.__LOCAL）。');
+  if (location.hostname.endsWith('github.io')) {
+    console.warn('[星光伴学屋] 运行在 GitHub Pages，但未配置 Worker 地址。请在 public/js/config.js 中填写 window.__API_BASE，否则无法读取数据。');
   }
   return '';
 })();
