@@ -4,4 +4,4 @@
  *   把下面改成你的 Worker 地址，例如 'https://xingguang.workers.dev'
  *   前端所有 /api 请求与实时同步 WebSocket 都会指向该地址，实现家人之间实时同步。
  */
-window.__API_BASE = 'https://banxuewu.1032237642.workers.dev/';
+window.__API_BASE = 'https://xingguang-banxuewu.1032237642.workers.dev/';
