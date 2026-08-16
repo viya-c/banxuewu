@@ -9,5 +9,5 @@ window.__GITHUB = {
   repo: 'xingguang',                // 仓库名，一般就是这个
   branch: 'main',                   // 默认分支
   dataPath: 'data/state.json',       // 不用改
-  token: 'github_pat_这里粘贴你刚复制的token'
+  token: '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'
 };
