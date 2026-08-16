@@ -18,7 +18,7 @@ class_name = "Realtime"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["Realtime"]
+new_sqlite_classes = ["Realtime"]
 
 # ---- 可选：图片存储（R2）。不配置也能跑，图片会回退为 base64 dataURL ----
 # [[r2_buckets]]
