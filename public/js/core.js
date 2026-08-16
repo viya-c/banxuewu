@@ -79,7 +79,7 @@ const emojiOf = s => SUBJ_EMOJI[s] || '📌';
 // 部署到 GitHub Pages 时，由 js/config.js 选择 window.__GITHUB（仓库当数据库）或 window.__LOCAL（纯本地）。
 const API_BASE = (function () {
   if (window.__API_BASE) return String(window.__API_BASE).replace(/\/+$/, '');
-  if (location.hostname.endsWith('github.io') &amp;&amp; !window.__GITHUB &amp;&amp; !window.__LOCAL) {
+  if (location.hostname.endsWith('github.io') && !window.__GITHUB && !window.__LOCAL) {
     console.warn('[星光伴学屋] 运行在 GitHub Pages，但 config.js 未配置后端（缺少 window.__GITHUB 或 window.__LOCAL）。');
   }
   return '';
@@ -89,60 +89,17 @@ const apiURL = p => API_BASE + p;
 
 async function api(path, opt = {}) {
   // 纯本地模式：数据存手机 localStorage，无后端
-  if (window.__LOCAL &amp;&amp; window.__LOCAL_API) {
+  if (window.__LOCAL && window.__LOCAL_API) {
     const j = await window.__LOCAL_API.api(path, opt);
     if (!j.ok) throw new Error(j.error || '操作失败');
     return j;
   }
   // GitHub 后端模式：所有请求走仓库当数据库
-  if (window.__GITHUB &amp;&amp; window.__GH_API) {
+  if (window.__GITHUB && window.__GH_API) {
     const j = await window.__GH_API.api(path, opt);
     if (!j.ok) throw new Error(j.error || '操作失败');
     return j;
   }
-  const res = await fetch(apiURL('/api' + path), {
-    method: opt.method || 'GET',
-    headers: { 'Content-Type': 'application/json', 'X-Access-Code': S.token },
-    body: opt.body ? JSON.stringify(opt.body) : undefined
-  });
-  let j;
-  try { j = await res.json(); } catch (_) { throw new Error('服务器响应异常'); }
-  if (res.status === 401) { logout(); throw new Error(j.error || '未授权'); }
-  if (!j.ok) throw new Error(j.error || '操作失败');
-  return j;
-}
-
-/* ---------- 实时同步（WebSocket）----------
-   仅在配置了 API_BASE（即部署到 Worker）时启用；本地 server.js 不支持 WS，自动降级为
-   visibilitychange 回到前台刷新（现有行为）。收到后端广播的 {type:'sync'} 即重新拉取状态。 */
-const RT = { ws: null, retry: 0, timer: null, lastSync: 0 };
-function connectRealtime() {
-  // GitHub 后端：用轮询同步替代 WebSocket（无服务器推送）
-  if (window.__GITHUB &amp;&amp; window.__GH_API) { window.__GH_API.startSync(); return; }
-  if (RT.ws || !API_BASE || !S.token) return;        // 本地 / 未部署 / 未登录 → 不连
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const url = API_BASE.replace(/^https?:/, proto) + '/api/ws?token=' + encodeURIComponent(S.token);
-  try {
-    const ws = new WebSocket(url);
-    RT.ws = ws;
-    ws.onopen = () => { RT.retry = 0; console.log('[实时同步] 已连接'); };
-    ws.onmessage = ev => {
-      try {
-        const m = JSON.parse(ev.data);
-        if (m &amp;&amp; m.type === 'sync') {
-          const now = Date.now();
-          if (now - RT.lastSync < 800) return;       // 去抖：避免同一写操作触发多次刷新
-          RT.lastSync = now;
-          if (S.data) refresh().catch(() => { });
-        }
-      } catch (_) { }
-    };
-    ws.onclose = () => { RT.ws = null; scheduleReconnect(); };
-    ws.onerror = () => { try { ws.close(); } catch (_) { } };
-  } catch (_) { scheduleReconnect(); }
-}
-
-async function api(path, opt = {}) {
   const res = await fetch(apiURL('/api' + path), {
     method: opt.method || 'GET',
     headers: { 'Content-Type': 'application/json', 'X-Access-Code': S.token },
@@ -160,6 +117,8 @@ async function api(path, opt = {}) {
    visibilitychange 回到前台刷新（现有行为）。收到后端广播的 {type:'sync'} 即重新拉取状态。 */
 const RT = { ws: null, retry: 0, timer: null, lastSync: 0 };
 function connectRealtime() {
+  // GitHub 后端：用轮询同步替代 WebSocket（无服务器推送）
+  if (window.__GITHUB && window.__GH_API) { window.__GH_API.startSync(); return; }
   if (RT.ws || !API_BASE || !S.token) return;        // 本地 / 未部署 / 未登录 → 不连
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const url = API_BASE.replace(/^https?:/, proto) + '/api/ws?token=' + encodeURIComponent(S.token);
