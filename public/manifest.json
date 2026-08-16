@@ -1,0 +1,13 @@
+{
+  "name": "星光伴学屋",
+  "short_name": "学习管家",
+  "description": "孩子的课表、延时课、课外课包、作业打卡与成绩曲线，一家人共同管理",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4F7FF",
+  "theme_color": "#6E9BFF",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
