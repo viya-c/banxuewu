@@ -3,5 +3,5 @@ window.__GITHUB = {
   repo: 'banxuewu',
   branch: 'main',
   dataPath: 'state.json',
-  token: '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'
+  token: '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'
 };
