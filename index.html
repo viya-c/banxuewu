@@ -2810,7 +2810,7 @@ function schedEditor(p) {
   const sch = (p && p.schedule && p.schedule.length) ? p.schedule : [{ weekday: 2, start: '18:30' }];
   return `<div id="pfSched">${sch.map(schedRow).join('')}</div>
     <button class="btn ghost xs" style="margin-top:6px" onclick="addSchedRow()">＋ 再加一个上课日</button>
-    <p class="muted" style="margin-top:6px">每周固定「星期 + 开始时间」即可，结束时间按上方「上课时长」自动推算，保存后依「总课时」排出每一节课次</p>`;
+    <p class="muted" style="margin-top:6px">每周固定「星期 + 开始时间」即可，结束时间按上方「上课时长」自动推算；每次「再加一个上课日」会默认带出上一次的时间，并自动顺到未设置的星期。保存后依「总课时」排出每一节课次。<br>📌 <b>暑假/寒假课</b>：这里只能选「星期几」，不能选假期。安排暑假课请用真实星期几（如周二、周四），再把上方「开课日期 ~ 有效期至」填成暑假区间，并在课程表顶部把学期切到「暑假」即可看到。</p>`;
 }
 /** 依据「开始时间 + 上课时长」重算某一行的结束时间（显示在禁用的结束输入框中） */
 function recalcSchedEnd(row) {
@@ -2834,7 +2834,27 @@ function schedRow(s) {
     <input type="time" value="${end}" style="flex:.95" placeholder="结束" disabled title="根据「上课时长(分钟)」自动推算" tabindex="-1">
     <button type="button" class="btn xs ghost" onclick="this.closest('[data-sched]').remove();recalcAllSchedEnds()">✕</button></div>`;
 }
-function addSchedRow() { document.getElementById('pfSched').insertAdjacentHTML('beforeend', schedRow({ weekday: 2, start: '18:30' })); recalcAllSchedEnds(); document.getElementById('pfSched').dispatchEvent(new Event('input')); }
+function addSchedRow() {
+  const box = document.getElementById('pfSched');
+  if (!box) return;
+  // 默认星期：取第一个尚未使用的星期，做到「每天一个」
+  const used = Array.from(box.querySelectorAll('[data-sched] select')).map(s => Number(s.value));
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  let wd = order.find(x => used.indexOf(x) < 0);
+  if (wd == null) wd = 2;
+  // 默认开始时间：带入上一次填写的时间
+  const rows = box.querySelectorAll('[data-sched]');
+  let start = '18:30';
+  if (rows.length) {
+    const ins = rows[rows.length - 1].querySelectorAll('select,input');
+    if (ins[1] && ins[1].value) start = ins[1].value;
+  }
+  box.insertAdjacentHTML('beforeend', schedRow({ weekday: wd, start }));
+  recalcAllSchedEnds();
+  const last = box.querySelector('[data-sched]:last-child');
+  if (last) { const ti = last.querySelector('input[type=time]'); if (ti) ti.focus(); }
+  box.dispatchEvent(new Event('input'));
+}
 /** 读取每周固定时间：只存星期+开始，结束时间按「开始 + 上课时长」自动推算 */
 function readSched() {
   const durEl = document.getElementById('pfDur');
@@ -2843,7 +2863,37 @@ function readSched() {
     const els = r.querySelectorAll('select,input');
     const start = els[1].value;
     return { weekday: Number(els[0].value), start, end: minToHM(toMin(start) + dur) };
-  }).filter(s => s.weekday != null && s.start);
+  }).filter(s => s.weekday != null && s.weekday >= 0 && s.weekday <= 6 && s.start);
+}
+
+/** 保存/编辑课包后，把关联的「课外辅导」课程与课包每周安排完全同步：
+ *  - 课包里有的星期：已有课程更新上课时间，没有则自动新建一门关联课程
+ *  - 课包里去掉的星期：删除对应的关联课程（保持双向一致） */
+async function syncPkgTutorCourses(pkgId, sched, durationMin, meta) {
+  const linked = (S.data.courses || []).filter(c => c.packageId === pkgId && c.type === 'tutor');
+  const schedDays = sched.map(s => Number(s.weekday));
+  const ops = [];
+  for (const slot of sched) {
+    const wd = Number(slot.weekday);
+    const end = slot.end || endFromStart(slot.start, durationMin);
+    const exist = linked.find(c => Number(c.weekday) === wd);
+    if (exist) {
+      if (exist.startTime !== slot.start || exist.endTime !== end)
+        ops.push(api('/courses/' + exist.id, { method: 'PUT', body: { startTime: slot.start, endTime: end } }));
+    } else {
+      ops.push(api('/courses', { method: 'POST', body: {
+        gradeId: gid(), type: 'tutor',
+        subject: meta.subject, name: meta.name,
+        teacher: meta.teacher, location: meta.org, teacherContact: meta.teacherContact,
+        weekType: 'all', termId: null, note: '',
+        startTime: slot.start, endTime: end, packageId: pkgId, periodIdx: null
+      } }));
+    }
+  }
+  for (const c of linked) {
+    if (schedDays.indexOf(Number(c.weekday)) < 0) ops.push(api('/courses/' + c.id, { method: 'DELETE' }));
+  }
+  if (ops.length) await Promise.all(ops);
 }
 
 /** 客户端依据「总课时 + 每次课时数 + 开课日 + 每周固定安排」推算预计结课日 */
@@ -2956,9 +3006,8 @@ function pkgForm(id) {
             pkgId = r.data.id;
             await api(`/packages/${r.data.id}/generate`, { method: 'POST' });
           }
-          // 同步关联课表课程的结束时间 = 开始时间 + 上课时长
-          await Promise.all(S.data.courses.filter(c => c.packageId === pkgId && c.startTime).map(c =>
-            api('/courses/' + c.id, { method: 'PUT', body: { endTime: minToHM(toMin(c.startTime) + durationMin) } })));
+          // 同步关联课外辅导课程：星期 + 上课时间 与课包每周安排完全一致
+          await syncPkgTutorCourses(pkgId, sched, durationMin, { subject: body.subject, name: body.name, teacher: body.teacher, org: body.org, teacherContact: body.teacherContact });
           await refresh(); closeSheet(); toast('已保存 🎉');
         } catch (e) { toast(e.message); }
       };
