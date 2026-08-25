@@ -951,6 +951,7 @@ function reconcile(DB) {
     const ok = (data) => ({ ok: true, data });
 
     if (seg[0] === 'meta') return { ok: true, version: APP_VERSION, build: BUILD_NO, familyName: state.family.name, childName: state.family.childName, childAvatar: state.family.childAvatar, needCode: !!state.family.accessCode };
+    if (seg[0] === 'commit' && method === 'POST') { await commit(); return ok({ ok: true }); }
     if (seg[0] === 'login' && method === 'POST') {
       const good = String(body.code || '').trim() === String(state.family.accessCode || '').trim();
       if (!good) return { ok: false, error: '访问码不正确' };
@@ -1286,6 +1287,14 @@ const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.
 const nowHM = () => { const d = new Date(); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
 const toMin = hm => { if (!hm) return 0; const [h, m] = String(hm).split(':').map(Number); return h * 60 * 1 + (m || 0); };
 const minToHM = m => `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`;
+// 时长/倒计时格式化：X小时Y分钟（不足1小时显示分钟，整小时只显示小时）
+const fmtDur = m => {
+  m = Math.max(0, Math.round(Number(m) || 0));
+  const h = Math.floor(m / 60), mm = m % 60;
+  if (h && mm) return h + '小时' + mm + '分钟';
+  if (h) return h + '小时';
+  return mm + '分钟';
+};
 
 function fmtDate(s) {
   if (!s) return '';
@@ -1476,6 +1485,16 @@ function courseTime(c) {
 }
 function courseTitle(c) {
   return c.name || c.subject || '未命名';
+}
+
+/** 课外辅导课程是否应在某日期显示：关联了课包时，需落在课包「开课~有效期」区间内；无课包关联的常驻显示 */
+function courseInPkgRange(c, iso) {
+  if (!c.packageId) return true;
+  const p = S.data.packages.find(x => x.id === c.packageId);
+  if (!p) return true;
+  if (p.startDate && iso < p.startDate) return false;
+  if (p.endDate && iso > p.endDate) return false;
+  return true;
 }
 /** 某节课当天是否生效（单双周） */
 function courseActive(c, parity) {
@@ -1815,7 +1834,7 @@ function ttWeekHTML(list) {
   days.forEach(d => {
     const iso = dayISO[d];
     const isToday = iso === today();
-    const cs = vis.filter(c => c.type === 'tutor' && Number(c.weekday) === d)
+    const cs = vis.filter(c => c.type === 'tutor' && Number(c.weekday) === d && courseInPkgRange(c, iso))
       .sort((a, b) => toMin(courseTime(a).start) - toMin(courseTime(b).start));
     if (!cs.length) {
       h += canEdit('course') ? `<div class="tt-cell empty-cell ${isToday ? 'is-today' : ''}" onclick="courseForm(null,{type:'tutor',weekday:${d}})">＋</div>` : `<div class="tt-cell empty-cell ${isToday ? 'is-today' : ''}"></div>`;
@@ -2205,12 +2224,12 @@ function renderToday() {
   const nc = nextCourse();
   if (nc) {
     const diff = toMin(nc._t.start) - now;
-    const cd = diff >= 60 ? `${Math.floor(diff / 60)}<span>小时后</span>` : `${diff}<span>分钟后</span>`;
+    const cd = fmtDur(diff);
     h += `<div class="next-card" onclick="courseDetail('${nc.id}')">
       <div class="next-ic">${TYPE_EMOJI[nc.type]}</div>
       <div class="grow" style="min-width:0"><b class="ell">下节课 · ${esc(courseTitle(nc))}</b>
       <p class="ell">${nc._t.start}-${nc._t.end} ${nc.location ? '· ' + esc(nc.location) : ''} ${nc.teacher ? '· ' + esc(nc.teacher) + '老师' : ''}</p></div>
-      <div class="next-cd"><b>${cd.split('<span>')[0]}</b><span>${cd.split('<span>')[1].replace('</span>', '')}</span></div></div>`;
+      <div class="next-cd"><b>${cd}</b></div></div>`;
   } else if (cs.length) {
     h += `<div class="next-card" style="background:linear-gradient(120deg,#25C685,#5BD4A8)">
       <div class="next-ic">🎉</div><div class="grow"><b>今天的课全部上完啦</b><p>记得完成作业打卡哦～</p></div></div>`;
@@ -2896,32 +2915,37 @@ function readSched() {
 
 /** 保存/编辑课包后，把关联的「课外辅导」课程与课包每周安排完全同步：
  *  - 课包里有的星期：已有课程更新上课时间，没有则自动新建一门关联课程
- *  - 课包里去掉的星期：删除对应的关联课程（保持双向一致） */
+ *  - 课包里去掉的星期：删除对应的关联课程（保持双向一致）
+ *  直接在内存改完再一次性 commit，避免多次整文件上传互相踩 SHA 导致「数据冲突」与卡顿 */
 async function syncPkgTutorCourses(pkgId, sched, durationMin, meta) {
-  const linked = (S.data.courses || []).filter(c => c.packageId === pkgId && c.type === 'tutor');
+  const g = meta.gradeId || gid();
+  const courses = S.data.courses || (S.data.courses = []);
+  const linked = courses.filter(c => c.packageId === pkgId && c.type === 'tutor');
   const schedDays = sched.map(s => Number(s.weekday));
-  const ops = [];
   for (const slot of sched) {
     const wd = Number(slot.weekday);
     const end = slot.end || endFromStart(slot.start, durationMin);
     const exist = linked.find(c => Number(c.weekday) === wd);
     if (exist) {
-      if (exist.startTime !== slot.start || exist.endTime !== end)
-        ops.push(api('/courses/' + exist.id, { method: 'PUT', body: { startTime: slot.start, endTime: end } }));
+      if (exist.startTime !== slot.start || exist.endTime !== end) { exist.startTime = slot.start; exist.endTime = end; }
     } else {
-      ops.push(api('/courses', { method: 'POST', body: {
-        gradeId: meta.gradeId || gid(), type: 'tutor',
+      courses.push({
+        id: uid('c'), gradeId: g, type: 'tutor',
         subject: meta.subject, name: meta.name,
         teacher: meta.teacher, location: meta.org, teacherContact: meta.teacherContact,
         weekType: 'all', termId: null, note: '',
-        startTime: slot.start, endTime: end, packageId: pkgId, periodIdx: null
-      } }));
+        startTime: slot.start, endTime: end, packageId: pkgId, periodIdx: null,
+        createdAt: new Date().toISOString()
+      });
     }
   }
   for (const c of linked) {
-    if (schedDays.indexOf(Number(c.weekday)) < 0) ops.push(api('/courses/' + c.id, { method: 'DELETE' }));
+    if (schedDays.indexOf(Number(c.weekday)) < 0) {
+      const i = courses.findIndex(x => x.id === c.id);
+      if (i >= 0) courses.splice(i, 1);
+    }
   }
-  if (ops.length) await Promise.all(ops);
+  await api('/commit', { method: 'POST' });
 }
 
 /** 客户端依据「总课时 + 每次课时数 + 开课日 + 每周固定安排」推算预计结课日 */
@@ -3840,7 +3864,7 @@ function renderTop() {
   const todo = gHomeworks().filter(h => h.status !== 'done').length;
   const lowPkg = gPackages().filter(p => p.status !== 'done' && p.stats.remain <= S.data.settings.reminders.packageLowHours).length;
   const nc = nextCourse();
-  const nt = nc ? `${toMin(nc._t.start) - toMin(nowHM())}<small style="font-size:10px">分</small>` : '—';
+  const nt = nc ? fmtDur(toMin(nc._t.start) - toMin(nowHM())) : '—';
 
   $('#tbStats').innerHTML = `
     <div class="tb-stat" onclick="go('today')"><b>${cs.length}</b><span>作业</span></div>
@@ -3886,7 +3910,7 @@ function checkReminders() {
     todayCourses().forEach(c => {
       const diff = toMin(c._t.start) - now;
       if (diff > 0 && diff <= (r.classBefore || 30)) {
-        notify(`class_${t}_${c.id}`, `${diff}分钟后上课：${courseTitle(c)}`,
+        notify(`class_${t}_${c.id}`, `${fmtDur(diff)}后上课：${courseTitle(c)}`,
           `${c._t.start}-${c._t.end}${c.location ? ' · ' + c.location : ''}${c.teacher ? ' · ' + c.teacher + '老师' : ''}`);
       }
     });
