@@ -1061,8 +1061,23 @@ function reconcile(DB) {
     if (COLLECTIONS.includes(col)) {
       const list = state[col];
       if (method === 'GET') return ok(list);
-      if (method === 'POST') { const item = { id: uid(col[0]), createdAt: new Date().toISOString(), ...body }; if (col === 'packages') item.records = item.records || []; if (col === 'grades') { if (item.current) state.grades.forEach(g => g.current = false); item.archived = !!item.archived; } list.push(item); await commit(); return ok(col === 'packages' ? { ...item, stats: packageStats(item) } : item); }
-      if (method === 'PUT' && seg[1]) { const i = list.findIndex(x => x.id === seg[1]); if (i < 0) return { ok: false, error: '记录不存在' }; list[i] = { ...list[i], ...body, id: list[i].id, updatedAt: new Date().toISOString() }; if (col === 'grades' && body.current) state.grades.forEach(g => { if (g.id !== seg[1]) g.current = false; }); await commit(); return ok(col === 'packages' ? { ...list[i], stats: packageStats(list[i]) } : list[i]); }
+      if (method === 'POST') { const item = { id: uid(col[0]), createdAt: new Date().toISOString(), ...body }; if (col === 'packages') { item.records = item.records || []; ensureSessions(item); syncLinkedCourses(item, { subject: item.subject, name: item.name, teacher: item.teacher, org: item.org, teacherContact: item.teacherContact }); } if (col === 'grades') { if (item.current) state.grades.forEach(g => g.current = false); item.archived = !!item.archived; } list.push(item); await commit(); return ok(col === 'packages' ? { ...item, stats: packageStats(item) } : item); }
+      if (method === 'PUT' && seg[1]) {
+        const i = list.findIndex(x => x.id === seg[1]); if (i < 0) return { ok: false, error: '记录不存在' };
+        const oldSched = list[i].schedule;
+        list[i] = { ...list[i], ...body, id: list[i].id, updatedAt: new Date().toISOString() };
+        if (col === 'grades' && body.current) state.grades.forEach(g => { if (g.id !== seg[1]) g.current = false; });
+        // 课包上课时间变化：端点内一次性完成「重排/更新课次 + 同步关联课程 + 提交」，避免多次全量提交冲突
+        if (col === 'packages' && body.schedule) {
+          ensureSessions(list[i]);
+          const ow = (oldSched || []).map(x => Number(x.weekday)).sort().join(',');
+          const nw = (body.schedule || []).map(x => Number(x.weekday)).sort().join(',');
+          if (ow !== nw) rescheduleFuture(list[i]);        // 星期变了 → 重排所有未来课次（含星期）
+          else updateFutureTimes(list[i], body.schedule);   // 仅改起止时间 → 只更新时间，不动日期/星期
+          syncLinkedCourses(list[i], { subject: body.subject, name: body.name, teacher: body.teacher, org: body.org, teacherContact: body.teacherContact });
+        }
+        await commit(); return ok(col === 'packages' ? { ...list[i], stats: packageStats(list[i]) } : list[i]);
+      }
       if (method === 'DELETE' && seg[1]) { const i = list.findIndex(x => x.id === seg[1]); if (i < 0) return { ok: false, error: '记录不存在' }; const [removed] = list.splice(i, 1); if (col === 'grades') { state.courses = state.courses.filter(c => c.gradeId !== removed.id); state.packages = state.packages.filter(p => p.gradeId !== removed.id); state.homeworks = state.homeworks.filter(h => h.gradeId !== removed.id); state.exams = state.exams.filter(e => e.gradeId !== removed.id); if (removed.current && state.grades[0]) state.grades[0].current = true; } if (col === 'grades' || col === 'homeworks') { state.checkins = state.checkins.filter(c => state.homeworks.some(h => h.id === c.homeworkId)); } if (col === 'courses') state.homeworks.forEach(h => { if (h.courseId === removed.id) h.courseId = null; }); await commit(); return ok(removed); }
     }
 
@@ -1071,6 +1086,7 @@ function reconcile(DB) {
 
   /* 轮询同步（替代 WebSocket 实时通道） */
   async function syncOnce() {
+    if (window.__SAVING) return;            // 保存进行中，跳过轮询，避免覆盖本地尚未提交的改动
     if (!S.token || !S.data || syncing) return;
     syncing = true;
     try {
@@ -1841,8 +1857,10 @@ function ttWeekHTML(list) {
     } else {
       h += `<div style="display:flex;flex-direction:column;gap:3px">` + cs.map(c => {
         const t = courseTime(c);
+        const pk = c.packageId ? S.data.packages.find(p => p.id === c.packageId) : null;
+        const sub = pk && pk.org ? ` <small style="color:var(--mu)">· ${esc(pk.org)}</small>` : '';
         return `<div class="tt-cell t-tutor ${hasHW(c) ? 'hw-dot' : ''} ${isToday ? 'is-today' : ''}" onclick="courseDetail('${c.id}')">
-          ${esc(courseTitle(c))}<small>${esc(t.start || '')}</small>${linkSessionPill(c.packageId, dayISO[d])}</div>`;
+          ${esc(courseTitle(c))}${sub}<small>${esc(t.start || '')}</small>${linkSessionPill(c.packageId, dayISO[d])}</div>`;
       }).join('') + offTemplateSessionChips(dayISO[d]) + `</div>`;
     }
   });
@@ -1872,7 +1890,7 @@ function ttListHTML(list) {
   const days = ttDays();
   let h = '';
   days.forEach(d => {
-    const cs = list.filter(c => Number(c.weekday) === d)
+    const cs = list.filter(c => Number(c.weekday) === d && (c.type !== 'tutor' || !c.packageId || courseInPkgRange(c, ymd(dayDate(d)))))
       .sort((a, b) => {
         const o = { main: 0, extend: 1, tutor: 2 };
         if (o[a.type] !== o[b.type]) return o[a.type] - o[b.type];
@@ -2022,6 +2040,7 @@ function courseForm(id, preset) {
     const pa = document.getElementById('cfPkgArea');
     pa.innerHTML = (type === 'tutor' && pkgs.length)
       ? fSelect('cfPkg', '从课包导入（自动带出科目/老师/时间）', [{ v: '', t: '不关联' }].concat(pkgs.map(p => ({ v: p.id, t: p.name + '（剩' + (p.stats ? p.stats.remain : 0) + '课时）' }))), d.packageId || '')
+        + `<p class="muted" style="margin-top:6px">💡 关联课包后，上课星期/时间<b>以课包为准</b>、由系统自动同步，无需在此重复设置；要改时间请在课包里改即可。</p>`
       : '';
     const pkgSel = document.getElementById('cfPkg');
     if (pkgSel) pkgSel.onchange = () => { if (pkgSel.value) fillCourseFromPkg(pkgSel.value); };
@@ -2493,10 +2512,14 @@ const sessPill = (s) => {
   return `<span class="tag ${m.c}">${m.e} ${m.t}</span>`;
 };
 
+// 课包是否已过期：有效期 endDate 已过即视为过期，移出「在读」列表
+const pkgExpired = (p) => !!(p.endDate && relDays(p.endDate) < 0);
+
 function renderPackages() {
   const box = document.getElementById('pkgBody');
   const all = gPackages();
-  const active = all.filter(p => p.status !== 'done');
+  const expired = all.filter(p => p.status !== 'done' && pkgExpired(p));   // 已过期，移出在读列表
+  const active = all.filter(p => p.status !== 'done' && !pkgExpired(p));
   const done = all.filter(p => p.status === 'done');
   const low = S.data.settings.reminders.packageLowHours;
 
@@ -2525,7 +2548,7 @@ function renderPackages() {
     const termTag = pkgTermLabel(p);
     const warn = st.remain <= low;
     const expSoon = p.endDate && relDays(p.endDate) <= 30 && relDays(p.endDate) >= 0;
-    const expired = p.endDate && relDays(p.endDate) < 0;
+    const isExpired = p.endDate && relDays(p.endDate) < 0;
     const color = warn ? 'var(--warn)' : st.percent > 60 ? 'var(--yan)' : 'var(--fu)';
     const schedTx = (p.schedule || []).map(s => WD_S[Number(s.weekday)] + s.start).join('、');
     const nextS = (p.sessions || []).filter(s => s.status === 'sc').sort((a, b) => a.plannedDate.localeCompare(b.plannedDate))[0];
@@ -2534,7 +2557,7 @@ function renderPackages() {
         <div class="pkg-ic" style="background:${warn ? 'rgba(255,107,107,.12)' : 'rgba(165,94,234,.12)'}">${emojiOf(p.subject)}</div>
         <div class="col grow"><b class="ell" style="font-size:15px">${esc(p.name)}</b>
           <span class="muted ell">${esc(p.org || '未填机构')}${p.teacher ? ' · ' + esc(p.teacher) + '老师' : ''}${p.teacherContact ? ' · ' + esc(p.teacherContact) : ''}</span></div>
-        ${termTag ? `<span class="tag yan">${esc(termTag)}</span>` : ''}${warn ? '<span class="tag r">余额不足</span>' : expired ? '<span class="tag gy">已过期</span>' : expSoon ? '<span class="tag o">即将到期</span>' : '<span class="tag p">在读</span>'}
+        ${termTag ? `<span class="tag yan">${esc(termTag)}</span>` : ''}${warn ? '<span class="tag r">余额不足</span>' : isExpired ? '<span class="tag gy">已过期</span>' : expSoon ? '<span class="tag o">即将到期</span>' : '<span class="tag p">在读</span>'}
       </div>
       <div class="bar"><i style="width:${Math.min(100, st.percent)}%;background:${color}"></i></div>
       <div class="pkg-num">
@@ -2549,6 +2572,18 @@ function renderPackages() {
       ${p.endDate ? `<p class="muted" style="margin-top:4px">有效期至 ${fmtDateFull(p.endDate)}${expSoon ? `（还剩${relDays(p.endDate)}天）` : ''}</p>` : ''}
     </div>`;
   }).join('');
+
+  if (expired.length) {
+    h += `<div class="sec-h"><div class="sec-t">⏰ 已过期 <small>${expired.length} 个 · 不在在读列表，可删除</small></div>
+      ${canEdit('package') ? `<button class="btn xs ghost" onclick="clearExpiredPkgs()">一键清空</button>` : ''}</div>`;
+    h += expired.map(p => `<div class="card flat" style="opacity:.85" onclick="pkgDetail('${p.id}')">
+      <div class="row"><div class="col grow"><b class="ell" style="font-size:14px">${emojiOf(p.subject)} ${esc(p.name)}</b>
+        <span class="muted">有效期至 ${fmtDateFull(p.endDate)} · 剩余 ${p.stats.remain} 课时</span></div>
+      <span class="tag gy">已过期</span></div>
+      ${canEdit('package') ? `<div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn xs warn" onclick="event.stopPropagation();delPkg('${p.id}')">🗑 删除</button></div>` : ''}
+    </div>`).join('');
+  }
 
   if (done.length) {
     h += `<div class="sec-h"><div class="sec-t">📦 已结课 <small>${done.length} 个</small></div></div>`;
@@ -2917,35 +2952,28 @@ function readSched() {
  *  - 课包里有的星期：已有课程更新上课时间，没有则自动新建一门关联课程
  *  - 课包里去掉的星期：删除对应的关联课程（保持双向一致）
  *  直接在内存改完再一次性 commit，避免多次整文件上传互相踩 SHA 导致「数据冲突」与卡顿 */
-async function syncPkgTutorCourses(pkgId, sched, durationMin, meta) {
-  const g = meta.gradeId || gid();
+function syncLinkedCourses(pkg, meta) {
   const courses = S.data.courses || (S.data.courses = []);
-  const linked = courses.filter(c => c.packageId === pkgId && c.type === 'tutor');
+  const linked = courses.filter(c => c.packageId === pkg.id && c.type === 'tutor');
+  const sched = pkg.schedule || [];
   const schedDays = sched.map(s => Number(s.weekday));
+  const dur = pkg.durationMin || 90;
   for (const slot of sched) {
     const wd = Number(slot.weekday);
-    const end = slot.end || endFromStart(slot.start, durationMin);
+    const e = slot.end || endFromStart(slot.start, dur);
     const exist = linked.find(c => Number(c.weekday) === wd);
-    if (exist) {
-      if (exist.startTime !== slot.start || exist.endTime !== end) { exist.startTime = slot.start; exist.endTime = end; }
-    } else {
-      courses.push({
-        id: uid('c'), gradeId: g, type: 'tutor',
-        subject: meta.subject, name: meta.name,
-        teacher: meta.teacher, location: meta.org, teacherContact: meta.teacherContact,
-        weekType: 'all', termId: null, note: '',
-        startTime: slot.start, endTime: end, packageId: pkgId, periodIdx: null,
-        createdAt: new Date().toISOString()
-      });
-    }
+    if (exist) { exist.startTime = slot.start; exist.endTime = e; }
+    else { courses.push({ id: uid('c'), gradeId: pkg.gradeId, type: 'tutor', subject: meta.subject, name: meta.name, teacher: meta.teacher, location: meta.org, teacherContact: meta.teacherContact, weekType: 'all', termId: null, note: '', startTime: slot.start, endTime: e, packageId: pkg.id, periodIdx: null, createdAt: new Date().toISOString() }); }
   }
-  for (const c of linked) {
-    if (schedDays.indexOf(Number(c.weekday)) < 0) {
-      const i = courses.findIndex(x => x.id === c.id);
-      if (i >= 0) courses.splice(i, 1);
-    }
-  }
-  await api('/commit', { method: 'POST' });
+  for (const c of linked) { if (schedDays.indexOf(Number(c.weekday)) < 0) { const i = courses.findIndex(x => x.id === c.id); if (i >= 0) courses.splice(i, 1); } }
+}
+/** 仅更新「未来待上课次」的起止时间，不动日期与星期——用于「同星期、只改上课时间」的场景 */
+function updateFutureTimes(pkg, sched) {
+  const map = {}; (sched || []).forEach(s => map[Number(s.weekday)] = s);
+  const dur = pkg.durationMin || 90;
+  (pkg.sessions || []).forEach(s => {
+    if (s.status === 'sc') { const slot = map[Number(s.weekday)]; if (slot) { s.start = slot.start; s.end = slot.end || endFromStart(slot.start, dur); } }
+  });
 }
 
 /** 客户端依据「总课时 + 每次课时数 + 开课日 + 每周固定安排」推算预计结课日 */
@@ -3047,21 +3075,19 @@ function pkgForm(id) {
           leaveRule: pickVal('#pfLeaveRule') || 'keep', schedule: sched, records: p ? undefined : []
         };
         try {
+          window.__SAVING = true;
           let pkgId;
           if (p) {
             delete body.records;
             pkgId = id;
             await api('/packages/' + id, { method: 'PUT', body });
-            await api(`/packages/${id}/generate`, { method: 'POST' });
           } else {
             const r = await api('/packages', { method: 'POST', body: { ...body, sessions: [] } });
             pkgId = r.data.id;
-            await api(`/packages/${r.data.id}/generate`, { method: 'POST' });
           }
-          // 同步关联课外辅导课程：星期 + 上课时间 与课包每周安排完全一致
-          await syncPkgTutorCourses(pkgId, sched, durationMin, { subject: body.subject, name: body.name, teacher: body.teacher, org: body.org, teacherContact: body.teacherContact });
           await refresh(); closeSheet(); toast('已保存 🎉');
         } catch (e) { toast(e.message); }
+        finally { window.__SAVING = false; }
       };
     });
 }
@@ -3076,6 +3102,19 @@ function delPkg(id) {
   confirmBox('删除课包', '课包及其所有课次都会被删除，且无法恢复。确定吗？', async () => {
     try { await api('/packages/' + id, { method: 'DELETE' }); await refresh(); closeSheet(); toast('已删除'); }
     catch (e) { toast(e.message); }
+  });
+}
+
+// 一键清空所有已过期的课包（有效期 endDate 已过且未手动结课）
+async function clearExpiredPkgs() {
+  if (!needRole('package', '清空过期课包需要管理员权限')) return;
+  const ids = gPackages().filter(p => pkgExpired(p) && p.status !== 'done').map(p => p.id);
+  if (!ids.length) { toast('没有已过期的课包'); return; }
+  confirmBox('清空过期课包', `将永久删除 ${ids.length} 个已过期的课包及其课次，无法恢复。确定吗？`, async () => {
+    try {
+      for (const id of ids) await api('/packages/' + id, { method: 'DELETE' });
+      await refresh(); renderPackages(); toast(`已删除 ${ids.length} 个过期课包`);
+    } catch (e) { toast(e.message); }
   });
 }
 
@@ -3147,15 +3186,15 @@ async function rollPkg(id, targetGradeId, termId) {
     sessions: []
   };
   try {
+    window.__SAVING = true;
     const r = await api('/packages', { method: 'POST', body: newBody });
     const newId = r.data.id;
-    await api(`/packages/${newId}/generate`, { method: 'POST' });
-    await syncPkgTutorCourses(newId, sched, dur, { subject: p.subject, name: p.name + '（结转）', teacher: p.teacher || '', org: p.org || '', teacherContact: p.teacherContact || '', gradeId: tg.id });
     await api('/packages/' + id, { method: 'PUT', body: { status: 'done', note: (p.note ? p.note + '\n' : '') + `已结转 ${remain} 课时至「${tg.name}」` } });
     await refresh();
     await switchGrade(tg.id);   // 切到新年级（内部 refresh + closeSheet + toast）
     pkgDetail(newId);
   } catch (e) { toast(e.message); }
+  finally { window.__SAVING = false; }
 }
 
 </script>
@@ -3419,7 +3458,7 @@ function renderMe() {
     </div>
     <div class="pkg-num" style="margin-top:11px">
       <div><b>${gCourses().length}</b>门课程</div>
-      <div><b>${gPackages().filter(p => p.status !== 'done').length}</b>个课包</div>
+      <div><b>${gPackages().filter(p => p.status !== 'done' && !pkgExpired(p)).length}</b>个课包</div>
       <div><b>${hws.length}</b>条作业</div>
       <div><b class="ok">${doneRate}%</b>完成率</div>
     </div></div>`;
@@ -3862,7 +3901,7 @@ function renderTop() {
 
   const cs = todayCourses();
   const todo = gHomeworks().filter(h => h.status !== 'done').length;
-  const lowPkg = gPackages().filter(p => p.status !== 'done' && p.stats.remain <= S.data.settings.reminders.packageLowHours).length;
+  const lowPkg = gPackages().filter(p => p.status !== 'done' && !pkgExpired(p) && p.stats.remain <= S.data.settings.reminders.packageLowHours).length;
   const nc = nextCourse();
   const nt = nc ? fmtDur(toMin(nc._t.start) - toMin(nowHM())) : '—';
 
@@ -3870,7 +3909,7 @@ function renderTop() {
     <div class="tb-stat" onclick="go('today')"><b>${cs.length}</b><span>作业</span></div>
     <div class="tb-stat" onclick="go('today')"><b>${todo}</b><span>待办作业</span></div>
     <div class="tb-stat" onclick="go('today')"><b>${nt}</b><span>距下节课</span></div>
-    <div class="tb-stat" onclick="go('package')"><b>${lowPkg || gPackages().filter(p => p.status !== 'done').length}</b><span>${lowPkg ? '课包告急' : '在读课包'}</span></div>`;
+    <div class="tb-stat" onclick="go('package')"><b>${lowPkg || gPackages().filter(p => p.status !== 'done' && !pkgExpired(p)).length}</b><span>${lowPkg ? '课包告急' : '在读课包'}</span></div>`;
 }
 
 function renderVersion() {
@@ -3926,7 +3965,7 @@ function checkReminders() {
   }
 
   if (r.enablePackage) {
-    gPackages().filter(p => p.status !== 'done' && p.stats.remain <= (r.packageLowHours || 6)).forEach(p => {
+    gPackages().filter(p => p.status !== 'done' && !pkgExpired(p) && p.stats.remain <= (r.packageLowHours || 6)).forEach(p => {
       notify(`pkg_${t}_${p.id}`, `课包余额不足：${p.name}`, `仅剩 ${p.stats.remain} 课时，记得提前安排续费`);
     });
   }
