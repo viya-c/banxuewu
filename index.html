@@ -695,6 +695,7 @@ function ensureSessions(pkg) {
   const end = pkg.endDate ? new Date(pkg.endDate + 'T00:00:00') : null;
   let count = pkg.sessions.length;
   const d = new Date(start);
+  d.setDate(d.getDate() - 1);   // 从「有效期开始」当天起排（首轮 +1 回到 start，避免漏掉开始日当天）
   let guard = 0;
   while (count < target && guard++ < 1000) {
     d.setDate(d.getDate() + 1);
@@ -736,7 +737,7 @@ function nextFreeSlot(pkg, from) {
 
 /** 按「新每周固定上课时间」重排未来待上课次：
  *  - 保留历史已上课(at)/请假(lv)/补课(mk)/取消(no) 等记录不动
- *  - 按「剩余课时」从最后一个保留日期之后、且最早不早于今天，重新铺设未来 sc 课次
+ *  - 按「剩余课时」从最后已上课(at)日期之后、且最早不早于今天，重新铺设未来 sc 课次
  *  - 因此改星期 / 改时间后，未来课次一定按新排期生成（不再出现“没有需要重排的课次”或排到过去的情况） */
 function rescheduleFuture(pkg) {
   const sched = pkg.schedule || [];
@@ -750,10 +751,14 @@ function rescheduleFuture(pkg) {
   const attended = sessions.filter(s => s.status === 'at').length;
   const need = Math.max(0, target - attended);                     // 还需要的未来课次数
   const end = pkg.endDate ? new Date(pkg.endDate + 'T00:00:00') : null;
+  // 锚点取「最后已上课(at)日期」与「今天」的较大值：
+  //  - 只用 at，避免未来的请假/补课把重排起点推到未来、造成近期间空档
+  //  - 不早于今天，保证待上课次不会排到过去
   let anchor = t0;
-  if (keep.length) {
-    const lastD = keep.reduce((m, s) => (s.plannedDate > m ? s.plannedDate : m), '');
-    if (lastD) anchor = new Date(lastD + 'T00:00:00');
+  const ats = keep.filter(s => s.status === 'at');
+  if (ats.length) {
+    const lastAt = ats.reduce((m, s) => (s.plannedDate > m ? s.plannedDate : m), '');
+    if (lastAt) anchor = new Date(Math.max(new Date(lastAt + 'T00:00:00').getTime(), t0.getTime()));
   }
   const result = keep.slice();
   let made = 0, exceeded = false;
@@ -2017,6 +2022,7 @@ function courseForm(id, preset) {
   const dayOpts = [1, 2, 3, 4, 5, 6, 0].map(x => ({ v: x, t: WD_S[x] }));
   const body = `
     ${fPick('cfType', '课程类型', [{ v: 'main', t: '🏫 学校正课' }, { v: 'extend', t: '🌇 延时课' }, { v: 'tutor', t: '🎯 课外辅导' }], d.type, 'type')}
+    <div id="cfPkgArea"></div>
     ${fSelect('cfSubject', '科目', subjOptions(), d.subject, true)}
     ${fInput('cfName', '课程名称', d.name, '留空则用科目名，如「奥数思维A班」')}
     <div class="f"><label>星期${isEdit ? '' : '（可多选，一次添加多天）'} <em>*</em></label>
@@ -2029,7 +2035,6 @@ function courseForm(id, preset) {
     ${isEdit ? fSwitch('cfSync', '同步老师/地点到同类型同科目其他课', '默认开启，保持课表一致', true) : ''}
     ${fPick('cfWeekType', '上课频次', [{ v: 'all', t: '每周' }, { v: 'odd', t: '单周' }, { v: 'even', t: '双周' }], d.weekType)}
     ${gradeHasTerms() && d.type !== 'tutor' ? fPick('cfTerm', '学期', curGradeTerms().map(t => ({ v: t.id, t: t.name })).concat([{ v: '', t: '不指定（长线/跨学期）' }]), d.termId || todayTermId() || curTerm(), 'sm') : ''}
-    <div id="cfPkgArea"></div>
     ${fArea('cfNote', '备注', d.note, '选填，如需要带的教材/用品')}
   `;
   const foot = `<button class="btn ghost" onclick="closeSheet()">取消</button><button class="btn" id="cfSave">保存</button>`;
