@@ -734,37 +734,56 @@ function nextFreeSlot(pkg, from) {
   return ymd(fallback);
 }
 
-/** 重排未来待上课次到新周几 */
+/** 按「新每周固定上课时间」重排未来待上课次：
+ *  - 保留历史已上课(at)/请假(lv)/补课(mk)/取消(no) 等记录不动
+ *  - 按「剩余课时」从最后一个保留日期之后、且最早不早于今天，重新铺设未来 sc 课次
+ *  - 因此改星期 / 改时间后，未来课次一定按新排期生成（不再出现“没有需要重排的课次”或排到过去的情况） */
 function rescheduleFuture(pkg) {
   const sched = pkg.schedule || [];
   if (!sched.length) return 0;
   const t0 = new Date(); t0.setHours(0, 0, 0, 0);
-  const pend = (pkg.sessions || [])
-    .filter(s => s.status === 'sc')
-    .sort((a, b) => a.plannedDate.localeCompare(b.plannedDate));
-  let lastDate = t0;
-  const ats = (pkg.sessions || []).filter(s => s.status === 'at');
-  if (ats.length) {
-    const lastAt = ats.reduce((m, s) => (s.plannedDate > m ? s.plannedDate : m), '');
-    lastDate = new Date(lastAt + 'T00:00:00');
+  const dur = pkg.durationMin || 90;
+  const target = Math.ceil((Number(pkg.totalHours) || 0) / (Number(pkg.hoursEach) || 1)) || 0;
+  if (!target) return 0;
+  const sessions = pkg.sessions || [];
+  const keep = sessions.filter(s => s.status !== 'sc');            // 历史 / 特殊课次保留
+  const attended = sessions.filter(s => s.status === 'at').length;
+  const need = Math.max(0, target - attended);                     // 还需要的未来课次数
+  const end = pkg.endDate ? new Date(pkg.endDate + 'T00:00:00') : null;
+  let anchor = t0;
+  if (keep.length) {
+    const lastD = keep.reduce((m, s) => (s.plannedDate > m ? s.plannedDate : m), '');
+    if (lastD) anchor = new Date(lastD + 'T00:00:00');
   }
-  for (const s of pend) {
-    let d = new Date(lastDate.getTime());
-    let guard = 0;
-    while (guard++ < 400) {
-      d.setDate(d.getDate() + 1);
-      const wd = d.getDay();
-      const slot = sched.find(x => Number(x.weekday) === wd);
-      if (slot) {
-        s.plannedDate = ymd(d); s.weekday = wd;
-        s.start = slot.start; s.end = slot.end || endFromStart(slot.start, pkg.durationMin);
-        s.rescheduled = false; s.origDate = null;
-        lastDate = new Date(d.getTime());
-        break;
-      }
-    }
+  const result = keep.slice();
+  let made = 0, exceeded = false;
+  const d = new Date(anchor.getTime());
+  let guard = 0;
+  while (made < need && guard++ < 4000) {
+    d.setDate(d.getDate() + 1);
+    if (d < t0) continue;                        // 不把待上课次放到过去
+    const wd = d.getDay();
+    const slot = sched.find(x => Number(x.weekday) === wd);
+    if (!slot) continue;
+    const pd = ymd(d);
+    if (result.some(s => s.plannedDate === pd)) continue;
+    if (end && d > end) exceeded = true;         // 已超出原有效期，后续会顺延补足
+    result.push({
+      id: uid('s'), idx: result.length,
+      plannedDate: pd, weekday: wd,
+      start: slot.start, end: slot.end || endFromStart(slot.start, dur),
+      status: 'sc', rescheduled: true, makeupOf: null,
+      hours: Number(pkg.hoursEach) || 1, note: '', createdAt: new Date().toISOString()
+    });
+    made++;
   }
-  return pend.length;
+  pkg.sessions = result;
+  // 若改排期后超出原有效期导致没排满，顺延有效期补足，保证已购课时完整排满
+  if (exceeded && pkg.endDate) {
+    const last = result.reduce((m, s) => (s.plannedDate > m ? s.plannedDate : m), '');
+    if (last > pkg.endDate) pkg.endDate = last;
+  }
+  return made;
 }
 
 /* ---------------------------- 年级 / 迁移 ---------------------------- */
@@ -1069,10 +1088,9 @@ function reconcile(DB) {
         if (col === 'grades' && body.current) state.grades.forEach(g => { if (g.id !== seg[1]) g.current = false; });
         // 课包上课时间变化：端点内一次性完成「重排/更新课次 + 同步关联课程 + 提交」，避免多次全量提交冲突
         if (col === 'packages' && body.schedule) {
-          ensureSessions(list[i]);
           const ow = (oldSched || []).map(x => Number(x.weekday)).sort().join(',');
           const nw = (body.schedule || []).map(x => Number(x.weekday)).sort().join(',');
-          if (ow !== nw) rescheduleFuture(list[i]);        // 星期变了 → 重排所有未来课次（含星期）
+          if (ow !== nw) rescheduleFuture(list[i]);        // 星期变了 → 按新排期重铺所有未来课次
           else updateFutureTimes(list[i], body.schedule);   // 仅改起止时间 → 只更新时间，不动日期/星期
           syncLinkedCourses(list[i], { subject: body.subject, name: body.name, teacher: body.teacher, org: body.org, teacherContact: body.teacherContact });
         }
@@ -1859,8 +1877,9 @@ function ttWeekHTML(list) {
         const t = courseTime(c);
         const pk = c.packageId ? S.data.packages.find(p => p.id === c.packageId) : null;
         const sub = pk && pk.org ? ` <small style="color:var(--mu)">· ${esc(pk.org)}</small>` : '';
+        const title = pk ? pk.name : courseTitle(c);   // 关联课包时优先显示课包名称（而非图标/科目）
         return `<div class="tt-cell t-tutor ${hasHW(c) ? 'hw-dot' : ''} ${isToday ? 'is-today' : ''}" onclick="courseDetail('${c.id}')">
-          ${esc(courseTitle(c))}${sub}<small>${esc(t.start || '')}</small>${linkSessionPill(c.packageId, dayISO[d])}</div>`;
+          ${esc(title)}${sub}<small>${esc(t.start || '')}</small>${linkSessionPill(c.packageId, dayISO[d])}</div>`;
       }).join('') + offTemplateSessionChips(dayISO[d]) + `</div>`;
     }
   });
@@ -1903,9 +1922,10 @@ function ttListHTML(list) {
     const dd = dayDate(d);
     h += `<div class="card">` + cs.map((c, i) => {
       const t = courseTime(c);
+      const pk = c.packageId ? S.data.packages.find(p => p.id === c.packageId) : null;
       return `<div class="list-i" style="${i === cs.length - 1 ? 'border-bottom:none' : ''}" onclick="courseDetail('${c.id}')">
         <div class="list-ic">${emojiOf(c.subject)}</div>
-        <div class="col grow"><b class="ell" style="font-size:14px">${esc(courseTitle(c))}</b>
+        <div class="col grow"><b class="ell" style="font-size:14px">${esc(pk ? pk.name : courseTitle(c))}</b>
           <span class="muted">${t.start ? t.start + '-' + t.end : ''} ${c.teacher ? '· ' + esc(c.teacher) : ''} ${c.location ? '· ' + esc(c.location) : ''}</span></div>
         <div class="col" style="align-items:flex-end;gap:4px">
           ${c.packageId ? linkSessionPill(c.packageId, dd) : ''}
@@ -1926,7 +1946,7 @@ function courseDetail(id) {
 
   let body = `<div class="card" style="margin-bottom:12px">
     <div class="row"><div class="col grow">
-      <b style="font-size:17px">${emojiOf(c.subject)} ${esc(courseTitle(c))}</b>
+      <b style="font-size:17px">${emojiOf(c.subject)} ${esc(pkg ? pkg.name : courseTitle(c))}</b>
       <span class="tx2" style="margin-top:3px">${WD[Number(c.weekday)]} ${t.start ? t.start + ' - ' + t.end : ''}</span>
     </div><span class="tag ${TYPE_TAG[c.type]}">${TYPE_NAME[c.type]}</span></div>
     <div class="pkg-num" style="gap:18px">
@@ -1966,9 +1986,22 @@ function courseDetail(id) {
 
 function delCourse(id) {
   if (!needRole('course', '删除课程需要管理员权限')) return;
-  confirmBox('删除课程', '删除后这门课会从课表中移除，已记录的作业会保留但不再关联该课程。确定吗？', async () => {
-    try { await api('/courses/' + id, { method: 'DELETE' }); await refresh(); toast('已删除'); closeSheet(); }
-    catch (e) { toast(e.message); }
+  const c = S.data.courses.find(x => x.id === id);
+  if (!c) return;
+  // 关联的课外辅导：一次删除该课包在所有星期（所有天）的辅导课安排
+  const isLinkedTutor = c.type === 'tutor' && c.packageId;
+  const delIds = isLinkedTutor
+    ? S.data.courses.filter(x => x.type === 'tutor' && x.packageId === c.packageId).map(x => x.id)
+    : [id];
+  const pkgName = isLinkedTutor ? (S.data.packages.find(p => p.id === c.packageId) || {}).name : '';
+  const msg = isLinkedTutor
+    ? `将删除「${pkgName}」关联的<b>全部 ${delIds.length} 天</b>辅导课安排（课表所有星期一并移除），已记录的作业会保留但不再关联课程。确定吗？`
+    : '删除后这门课会从课表中移除，已记录的作业会保留但不再关联该课程。确定吗？';
+  confirmBox('删除课程', msg, async () => {
+    try {
+      for (const did of delIds) await api('/courses/' + did, { method: 'DELETE' });
+      await refresh(); toast(isLinkedTutor ? `已删除 ${delIds.length} 天辅导课安排` : '已删除'); closeSheet();
+    } catch (e) { toast(e.message); }
   });
 }
 
@@ -2948,9 +2981,10 @@ function readSched() {
   }).filter(s => s.weekday != null && s.weekday >= 0 && s.weekday <= 6 && s.start);
 }
 
-/** 保存/编辑课包后，把关联的「课外辅导」课程与课包每周安排完全同步：
- *  - 课包里有的星期：已有课程更新上课时间，没有则自动新建一门关联课程
- *  - 课包里去掉的星期：删除对应的关联课程（保持双向一致）
+/** 保存/编辑课包后，让「已导入」的课外辅导课程与课包保持联动（不再自动新建）：
+ *  - 课包里有的星期：对应关联课程更新上课时间（实时联动）
+ *  - 课包里去掉的星期：删除对应的关联课程
+ *  辅导课必须先在「课程」表单里「从课包导入」手动创建，这里只同步已存在的关联课程，
  *  直接在内存改完再一次性 commit，避免多次整文件上传互相踩 SHA 导致「数据冲突」与卡顿 */
 function syncLinkedCourses(pkg, meta) {
   const courses = S.data.courses || (S.data.courses = []);
@@ -2963,7 +2997,7 @@ function syncLinkedCourses(pkg, meta) {
     const e = slot.end || endFromStart(slot.start, dur);
     const exist = linked.find(c => Number(c.weekday) === wd);
     if (exist) { exist.startTime = slot.start; exist.endTime = e; }
-    else { courses.push({ id: uid('c'), gradeId: pkg.gradeId, type: 'tutor', subject: meta.subject, name: meta.name, teacher: meta.teacher, location: meta.org, teacherContact: meta.teacherContact, weekType: 'all', termId: null, note: '', startTime: slot.start, endTime: e, packageId: pkg.id, periodIdx: null, createdAt: new Date().toISOString() }); }
+    // 不再自动新建：辅导课由用户在「课程」表单「从课包导入」手动创建
   }
   for (const c of linked) { if (schedDays.indexOf(Number(c.weekday)) < 0) { const i = courses.findIndex(x => x.id === c.id); if (i >= 0) courses.splice(i, 1); } }
 }
