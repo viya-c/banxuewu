@@ -760,6 +760,11 @@ function rescheduleFuture(pkg) {
     const lastAt = ats.reduce((m, s) => (s.plannedDate > m ? s.plannedDate : m), '');
     if (lastAt) anchor = new Date(Math.max(new Date(lastAt + 'T00:00:00').getTime(), t0.getTime()));
   }
+  // 有效期开始日晚于锚点（如改了有效期开始日）→ 从有效期开始日重铺未来课次
+  if (pkg.startDate) {
+    const sd = new Date(pkg.startDate + 'T00:00:00');
+    if (sd.getTime() > anchor.getTime()) anchor = sd;
+  }
   const result = keep.slice();
   let made = 0, exceeded = false;
   const d = new Date(anchor.getTime());
@@ -1089,14 +1094,16 @@ function reconcile(DB) {
       if (method === 'PUT' && seg[1]) {
         const i = list.findIndex(x => x.id === seg[1]); if (i < 0) return { ok: false, error: '记录不存在' };
         const oldSched = list[i].schedule;
+        const oldStart = list[i].startDate;
         list[i] = { ...list[i], ...body, id: list[i].id, updatedAt: new Date().toISOString() };
         if (col === 'grades' && body.current) state.grades.forEach(g => { if (g.id !== seg[1]) g.current = false; });
-        // 课包上课时间变化：端点内一次性完成「重排/更新课次 + 同步关联课程 + 提交」，避免多次全量提交冲突
+        // 课包上课时间 / 有效期变化：端点内一次性完成「重排/更新课次 + 同步关联课程 + 提交」，避免多次全量提交冲突
         if (col === 'packages' && body.schedule) {
           const ow = (oldSched || []).map(x => Number(x.weekday)).sort().join(',');
           const nw = (body.schedule || []).map(x => Number(x.weekday)).sort().join(',');
-          if (ow !== nw) rescheduleFuture(list[i]);        // 星期变了 → 按新排期重铺所有未来课次
-          else updateFutureTimes(list[i], body.schedule);   // 仅改起止时间 → 只更新时间，不动日期/星期
+          const startChanged = (body.startDate || '') !== (oldStart || '');   // 有效期开始日变了 → 课次需从新起点重铺
+          if (ow !== nw || startChanged) rescheduleFuture(list[i]);   // 星期变了 或 有效期开始日变了 → 按新排期/新起点重铺未来课次
+          else updateFutureTimes(list[i], body.schedule);             // 仅改起止时间 → 只更新时间，不动日期/星期
           syncLinkedCourses(list[i], { subject: body.subject, name: body.name, teacher: body.teacher, org: body.org, teacherContact: body.teacherContact });
         }
         await commit(); return ok(col === 'packages' ? { ...list[i], stats: packageStats(list[i]) } : list[i]);
