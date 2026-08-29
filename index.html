@@ -222,7 +222,7 @@ img{max-width:100%;display:block}
 .next-card b{font-size:15px;font-weight:800;display:block}
 .next-card p{font-size:11.5px;opacity:.92;margin-top:2px}
 .next-cd{margin-left:auto;text-align:center;background:rgba(255,255,255,.22);border-radius:13px;padding:6px 10px;flex:0 0 auto}
-.next-cd b{font-size:16px}
+.next-cd b{font-size:15px}
 .next-cd span{font-size:9.5px;opacity:.9}
 
 /* 作业条目 */
@@ -561,8 +561,9 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.21';
-const BUILD_NO = '20260816b';
+const APP_VERSION = '1.0.23';
+const BUILD_NO = '20260828b';
+const BUILD_TIME = '2026-08-28';
 const HOUSEHOLD_ID = 'default';
 
 /* ---------------------------- 工具 ---------------------------- */
@@ -608,6 +609,7 @@ function defaultTermSegments(sy) {
 function packageStats(pkg) {
   const total = Number(pkg.totalHours) || 0;
   const hoursEach = Number(pkg.hoursEach) || 1;
+  const rolledHours = Number(pkg.rolledHours) || 0;   // 结转出去的课时：结转到新年级后，旧包剩余应归零、且记录结转量
   const sessions = pkg.sessions || [];
   if (sessions.length) {
     const consumed = sessions.reduce((s, x) => {
@@ -619,9 +621,9 @@ function packageStats(pkg) {
     const makeup = sessions.filter(x => x.status === 'mk').length;
     const leave = sessions.filter(x => x.status === 'lv').length;
     const cancelled = sessions.filter(x => x.status === 'no').length;
-    const remain = Math.max(0, total - consumed);
+    const remain = Math.max(0, total - consumed - rolledHours);
     return {
-      total, consumed, remain, leave, makeup, attended, cancelled,
+      total, consumed, remain, rolledHours, leave, makeup, attended, cancelled,
       scheduled: sessions.filter(x => x.status === 'sc').length,
       percent: total ? Math.round(consumed / total * 100) : 0
     };
@@ -631,8 +633,8 @@ function packageStats(pkg) {
   const leave = recs.filter(r => r.type === 'leave').length;
   const makeup = recs.filter(r => r.type === 'makeup').reduce((s, r) => s + (Number(r.hours) || 1), 0);
   const consumed = used;
-  const remain = Math.max(0, total - consumed);
-  return { total, consumed, remain, leave, makeup, attended: used, cancelled: 0, scheduled: Math.max(0, total - used), percent: total ? Math.round(consumed / total * 100) : 0 };
+  const remain = Math.max(0, total - consumed - rolledHours);
+  return { total, consumed, remain, rolledHours, leave, makeup, attended: used, cancelled: 0, scheduled: Math.max(0, total - used), percent: total ? Math.round(consumed / total * 100) : 0 };
 }
 function fixSessionDate(s) {
   if (!s.plannedDate || s.weekday == null) return;
@@ -796,6 +798,64 @@ function rescheduleFuture(pkg) {
   return made;
 }
 
+/** 统一重算课包全部「待上课(sc)」课次：保留历史已上课/请假/补课/取消 及 手动添加/调课 的课次，
+ *  其余 sc 按「当前每周固定时间 + 总课时 + 开课/有效期」重新铺满；每次保存/修改课包都会调用，
+ *  因此改开课日、有效期、星期、时长、总课时等都会自动反映到课次（不再需要单独「生成/补充」「重排」）。 */
+function rebuildPkgSessions(pkg) {
+  const sched = pkg.schedule || [];
+  if (!sched.length) return 0;
+  const dur = pkg.durationMin || 90;
+  const target = Math.ceil((Number(pkg.totalHours) || 0) / (Number(pkg.hoursEach) || 1)) || 0;
+  if (!target) return 0;
+  const sessions = pkg.sessions || [];
+  // 受保护（原样保留，不重排）：已处理的历史课次，或用户手动添加/调过的课次
+  const keep = sessions.filter(s => s.status !== 'sc' || s.manual === true);
+  const occupied = new Set(keep.map(s => s.plannedDate));
+  const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+  const end = pkg.endDate ? new Date(pkg.endDate + 'T00:00:00') : null;
+  // 起点：最后已上课(at)日期、今天、有效期开始日 三者取较大；开课日在未来则从开课日开始
+  let anchor = t0;
+  const ats = sessions.filter(s => s.status === 'at');
+  if (ats.length) {
+    const lastAt = ats.reduce((m, s) => (s.plannedDate > m ? s.plannedDate : m), '');
+    if (lastAt) anchor = new Date(Math.max(new Date(lastAt + 'T00:00:00').getTime(), t0.getTime()));
+  }
+  if (pkg.startDate) {
+    const sd = new Date(pkg.startDate + 'T00:00:00');
+    if (sd.getTime() > anchor.getTime()) anchor = sd;
+  }
+  const need = Math.max(0, target - keep.length);   // 还需铺的未来课次数
+  const result = keep.slice();
+  let made = 0, exceeded = false;
+  const d = new Date(anchor.getTime());
+  let guard = 0;
+  while (made < need && guard++ < 4000) {
+    d.setDate(d.getDate() + 1);
+    if (d < t0) continue;                 // 不把待上课次放到过去（创建/改期时已按已上课处理）
+    const wd = d.getDay();
+    const slot = sched.find(x => Number(x.weekday) === wd);
+    if (!slot) continue;
+    const pd = ymd(d);
+    if (occupied.has(pd)) continue;        // 跳过已存在课次（历史/手动/调课）的日期
+    if (end && d > end) exceeded = true;   // 超出原有效期，后续顺延补足
+    result.push({
+      id: uid('s'), idx: result.length,
+      plannedDate: pd, weekday: wd,
+      start: slot.start, end: slot.end || endFromStart(slot.start, dur),
+      status: 'sc', rescheduled: true, makeupOf: null,
+      hours: Number(pkg.hoursEach) || 1, note: '', createdAt: new Date().toISOString()
+    });
+    made++;
+  }
+  pkg.sessions = result;
+  // 改排期后超出原有效期导致没排满，顺延有效期补足，保证已购课时完整排满
+  if (exceeded && pkg.endDate) {
+    const last = result.reduce((m, s) => (s.plannedDate > m ? s.plannedDate : m), '');
+    if (last > pkg.endDate) pkg.endDate = last;
+  }
+  return made;
+}
+
 /* ---------------------------- 年级 / 迁移 ---------------------------- */
 function currentGrade(DB) { return DB.grades.find(g => g.current) || DB.grades[0]; }
 function migrateGrades(DB) {
@@ -895,6 +955,8 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [],
     changelog: [
+      { version: '1.0.23', date: '2026-08-28', items: ['课表「某天某课」一键布置作业：预填课程类型/课程/科目/日期，免重选', '结转新年级：旧包剩余课时归零并记录结转量，新课包可用课时=结转课时', '核查课包改日期/星期/时间不影响已记录课时消耗'] },
+      { version: '1.0.22', date: '2026-08-28', items: ['课包保存后自动按最新「开课日/有效期/每周时间/课时」重算全部课次（移除「生成/补充」「重排未来」手动按钮）', '首页展示版本号与更新时间', '统一各区域字体大小'] },
       { version: '1.0.21', date: '2026-08-16', items: ['彻底移除「萌宠卡」功能', 'GitHub 后端适配（仓库当数据库）'] }
     ]
   };
@@ -1015,7 +1077,7 @@ function reconcile(DB) {
       else if (act === 'reschedule') {
         if (!body.date) return { ok: false, error: '请选择调课后的日期' };
         if (!s.origDate) s.origDate = s.plannedDate;
-        s.plannedDate = body.date; s.weekday = new Date(body.date + 'T00:00:00').getDay(); s.rescheduled = true;
+        s.plannedDate = body.date; s.weekday = new Date(body.date + 'T00:00:00').getDay(); s.rescheduled = true; s.manual = true;
         if (body.start) s.start = body.start; if (body.end) s.end = body.end;
       }
       else if (act === 'makeup' || act === 'postpone') {
@@ -1036,7 +1098,7 @@ function reconcile(DB) {
         if (method === 'PUT') { if (body.status) s.status = body.status; if (body.note !== undefined) s.note = body.note; if (body.plannedDate) { s.plannedDate = body.plannedDate; s.weekday = new Date(body.plannedDate + 'T00:00:00').getDay(); } if (body.start) s.start = body.start; if (body.end) s.end = body.end; if (body.hours != null) s.hours = Number(body.hours) || 1; s.updatedAt = new Date().toISOString(); await commit(); return ok({ ...pkg, stats: packageStats(pkg) }); }
         if (method === 'DELETE') { pkg.sessions = pkg.sessions.filter(x => x.id !== seg[3]); await commit(); return ok({ ...pkg, stats: packageStats(pkg) }); }
       }
-      if (method === 'POST') { pkg.sessions.push({ id: uid('s'), idx: pkg.sessions.length, plannedDate: body.plannedDate || ymd(new Date()), weekday: body.weekday != null ? Number(body.weekday) : new Date((body.plannedDate || ymd(new Date())) + 'T00:00:00').getDay(), start: body.start || (pkg.schedule[0] && pkg.schedule[0].start) || '', end: body.end || (pkg.schedule[0] && pkg.schedule[0].end) || '', status: body.status || 'sc', rescheduled: !!body.rescheduled, makeupOf: body.makeupOf || null, hours: body.hours != null ? Number(body.hours) : (Number(pkg.hoursEach) || 1), note: body.note || '', createdAt: new Date().toISOString() }); await commit(); return ok({ ...pkg, stats: packageStats(pkg) }); }
+      if (method === 'POST') { pkg.sessions.push({ id: uid('s'), idx: pkg.sessions.length, plannedDate: body.plannedDate || ymd(new Date()), weekday: body.weekday != null ? Number(body.weekday) : new Date((body.plannedDate || ymd(new Date())) + 'T00:00:00').getDay(), start: body.start || (pkg.schedule[0] && pkg.schedule[0].start) || '', end: body.end || (pkg.schedule[0] && pkg.schedule[0].end) || '', status: body.status || 'sc', rescheduled: !!body.rescheduled, makeupOf: body.makeupOf || null, manual: !!body.manual, hours: body.hours != null ? Number(body.hours) : (Number(pkg.hoursEach) || 1), note: body.note || '', createdAt: new Date().toISOString() }); await commit(); return ok({ ...pkg, stats: packageStats(pkg) }); }
     }
 
     // 每日评价
@@ -1097,13 +1159,9 @@ function reconcile(DB) {
         const oldStart = list[i].startDate;
         list[i] = { ...list[i], ...body, id: list[i].id, updatedAt: new Date().toISOString() };
         if (col === 'grades' && body.current) state.grades.forEach(g => { if (g.id !== seg[1]) g.current = false; });
-        // 课包上课时间 / 有效期变化：端点内一次性完成「重排/更新课次 + 同步关联课程 + 提交」，避免多次全量提交冲突
-        if (col === 'packages' && body.schedule) {
-          const ow = (oldSched || []).map(x => Number(x.weekday)).sort().join(',');
-          const nw = (body.schedule || []).map(x => Number(x.weekday)).sort().join(',');
-          const startChanged = (body.startDate || '') !== (oldStart || '');   // 有效期开始日变了 → 课次需从新起点重铺
-          if (ow !== nw || startChanged) rescheduleFuture(list[i]);   // 星期变了 或 有效期开始日变了 → 按新排期/新起点重铺未来课次
-          else updateFutureTimes(list[i], body.schedule);             // 仅改起止时间 → 只更新时间，不动日期/星期
+        // 课包任意字段修改后：自动按最新「开课日/有效期/每周固定时间/总课时/时长」重算全部待上课次并同步关联课程
+        if (col === 'packages') {
+          rebuildPkgSessions(list[i]);
           syncLinkedCourses(list[i], { subject: body.subject, name: body.name, teacher: body.teacher, org: body.org, teacherContact: body.teacherContact });
         }
         await commit(); return ok(col === 'packages' ? { ...list[i], stats: packageStats(list[i]) } : list[i]);
@@ -1890,7 +1948,7 @@ function ttWeekHTML(list) {
         const pk = c.packageId ? S.data.packages.find(p => p.id === c.packageId) : null;
         const sub = pk && pk.org ? ` <small style="color:var(--mu)">· ${esc(pk.org)}</small>` : '';
         const title = pk ? pk.name : courseTitle(c);   // 关联课包时优先显示课包名称（而非图标/科目）
-        return `<div class="tt-cell t-tutor ${hasHW(c) ? 'hw-dot' : ''} ${isToday ? 'is-today' : ''}" onclick="courseDetail('${c.id}')">
+        return `<div class="tt-cell t-tutor ${hasHW(c) ? 'hw-dot' : ''} ${isToday ? 'is-today' : ''}" onclick="courseDetail('${c.id}','${dayISO[d]}')">
           ${esc(title)}${sub}<small>${esc(t.start || '')}</small>${linkSessionPill(c.packageId, dayISO[d])}</div>`;
       }).join('') + offTemplateSessionChips(dayISO[d]) + `</div>`;
     }
@@ -1909,7 +1967,7 @@ function cellHTML(list, day, type, idx, off) {
   if (!c) return canEdit('course') ? `<div class="tt-cell empty-cell ${isToday ? 'is-today' : ''}" onclick="courseForm(null,{type:'${type}',weekday:${day},periodIdx:${idx}})">＋</div>` : `<div class="tt-cell empty-cell ${isToday ? 'is-today' : ''}"></div>`;
   const cls = type === 'main' ? 't-main' : 't-extend';
   const sub = c.teacher || c.location || '';
-  return `<div class="tt-cell ${cls} ${hasHW(c) ? 'hw-dot' : ''} ${isToday ? 'is-today' : ''}" onclick="courseDetail('${c.id}')">
+  return `<div class="tt-cell ${cls} ${hasHW(c) ? 'hw-dot' : ''} ${isToday ? 'is-today' : ''}" onclick="courseDetail('${c.id}','${dayDate(d, off)}')">
     ${esc(courseTitle(c))}${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
 }
 
@@ -1935,7 +1993,7 @@ function ttListHTML(list) {
     h += `<div class="card">` + cs.map((c, i) => {
       const t = courseTime(c);
       const pk = c.packageId ? S.data.packages.find(p => p.id === c.packageId) : null;
-      return `<div class="list-i" style="${i === cs.length - 1 ? 'border-bottom:none' : ''}" onclick="courseDetail('${c.id}')">
+      return `<div class="list-i" style="${i === cs.length - 1 ? 'border-bottom:none' : ''}" onclick="courseDetail('${c.id}','${dd}')">
         <div class="list-ic">${emojiOf(c.subject)}</div>
         <div class="col grow"><b class="ell" style="font-size:14px">${esc(pk ? pk.name : courseTitle(c))}</b>
           <span class="muted">${t.start ? t.start + '-' + t.end : ''} ${c.teacher ? '· ' + esc(c.teacher) : ''} ${c.location ? '· ' + esc(c.location) : ''}</span></div>
@@ -1948,7 +2006,7 @@ function ttListHTML(list) {
 }
 
 /* ---------- 课程详情 ---------- */
-function courseDetail(id) {
+function courseDetail(id, day) {
   const c = S.data.courses.find(x => x.id === id);
   if (!c) return;
   const t = courseTime(c);
@@ -1984,7 +2042,7 @@ function courseDetail(id) {
   }
 
   body += `<div class="sec-h" style="margin-top:4px"><div class="sec-t">📝 相关作业 <small>${undone} 项待完成</small></div>
-    ${canEdit('homework') ? `<button class="btn xs" onclick="closeSheet();hwForm(null,{courseId:'${c.id}'})">+ 布置</button>` : ''}</div>`;
+    ${canEdit('homework') ? `<button class="btn xs fu" onclick="closeSheet();hwForm(null,{courseId:'${c.id}'${day ? `,day:'${day}'` : ''}})">📝 布置作业</button>` : ''}</div>`;
   body += hws.length
     ? hws.slice(0, 6).map(h => hwItemHTML(h, true)).join('')
     : `<div class="card flat center"><span class="muted">暂无作业记录</span></div>`;
@@ -2440,11 +2498,14 @@ function delHW(id) {
 function hwForm(id, preset) {
   if (!needRole('homework')) return;
   const x = id ? S.data.homeworks.find(y => y.id === id) : null;
+  // 从课表「某天某课」一键布置：按课程预填类型/课程/科目/日期，免去重新选择关联课程、填写课程名
+  const presetCourse = (preset && preset.courseId) ? S.data.courses.find(c => c.id === preset.courseId) : null;
+  const initType = presetCourse ? presetCourse.type : (x ? (x.source || 'main') : 'main');
   const d = Object.assign({
-    assignDate: today(), dueDate: today(), dueTime: '21:00', subject: '语文', status: 'todo'
+    assignDate: (preset && preset.day) || today(), dueDate: (preset && preset.day) || today(), dueTime: '21:00',
+    subject: presetCourse ? presetCourse.subject : '语文', status: 'todo'
   }, preset || {}, x || {});
   const courses = gCourses().sort((a, b) => Number(a.weekday) - Number(b.weekday));
-  const initType = d.source || 'main';
   // 按课程类型过滤“来自哪节课”，并随类型切换重排
   const renderHwCourseOpts = (type) => [{ v: '', t: '不关联具体课程' }].concat(
     courses.filter(c => c.type === type).map(c => ({
@@ -2634,7 +2695,7 @@ function renderPackages() {
     h += `<div class="sec-h"><div class="sec-t">📦 已结课 <small>${done.length} 个</small></div></div>`;
     h += done.map(p => `<div class="card flat" onclick="pkgDetail('${p.id}')">
       <div class="row"><div class="col grow"><b class="ell" style="font-size:14px">${emojiOf(p.subject)} ${esc(p.name)}</b>
-        <span class="muted">${p.stats.consumed}/${p.stats.total} 课时 · ${esc(p.org || '')}</span></div>
+        <span class="muted">${p.stats.consumed}/${p.stats.total} 课时${p.rolledHours ? ' · 已结转' + p.rolledHours + '课时' : ''} · ${esc(p.org || '')}</span></div>
       <span class="tag gy">已结课</span></div></div>`).join('');
   }
 
@@ -2684,14 +2745,14 @@ function pkgDetail(id) {
       ${p.leaveRule ? `<p class="muted">🙋 请假规则：${LEAVE_RULE[p.leaveRule] || p.leaveRule}</p>` : ''}
       ${linked.length ? `<p class="muted">🗓 已关联课表：${linked.map(c => WD_S[Number(c.weekday)] + courseTime(c).start).join('、')}</p>` : ''}
       ${p.note ? `<p class="tx2" style="margin-top:7px">${esc(p.note)}</p>` : ''}
+      ${p.rolledHours ? `<p class="muted" style="color:var(--ok);margin-top:7px">⬆ 已结转 <b style="color:var(--ok)">${p.rolledHours}</b> 课时至新年级（旧包剩余课时已归零）</p>` : ''}
+      ${p.fromRoll ? `<p class="muted" style="margin-top:7px">↘ 由旧课包结转而来，可用课时 <b>${p.fromRollHours || 0}</b> 节</p>` : ''}
     </div>
 
     <div class="f2" style="margin-bottom:12px">
-      ${canEdit('package') ? `<button class="btn fu" onclick="genSessions('${p.id}')">🗓 生成/补充课次</button>
-      <button class="btn ghost" onclick="addSessionForm('${p.id}')">＋ 手动添加课次</button>
-      ${p.status !== 'done' ? `<button class="btn ghost" onclick="rescheduleFuture('${p.id}')">↻ 重排未来课次</button>` : ''}` : ''}
+      ${canEdit('package') ? `<button class="btn ghost" onclick="addSessionForm('${p.id}')">＋ 手动添加课次</button>` : ''}
     </div>
-    ${needGen && canEdit('package') ? `<p class="muted" style="margin:-6px 0 12px">还有 ${target - sessions.length} 节课次未排，点「生成/补充课次」自动按固定时间排出。</p>` : ''}
+    <p class="muted" style="margin:-6px 0 12px">📌 修改课包信息（开课/有效期/每周时间/课时）保存后会<b>自动重排全部课次</b>，无需手动生成或重排。</p>
 
     <div class="f2" style="margin-bottom:12px">
       ${canRoll ? `<button class="btn fu" onclick="rollPkgForm('${p.id}')">⬆ 结转新年级</button>` : ''}
@@ -2718,7 +2779,7 @@ function renderSessMonths(p) {
   const groups = {};
   (p.sessions || []).forEach(s => { const ym = s.plannedDate.slice(0, 7); (groups[ym] = groups[ym] || []).push(s); });
   const yms = Object.keys(groups).sort();
-  if (!yms.length) { wrap.innerHTML = `<div class="card flat center"><span class="muted">还没有课次，点上方「生成/补充课次」</span></div>`; return; }
+  if (!yms.length) { wrap.innerHTML = `<div class="card flat center"><span class="muted">还没有课次。保存课包（设置好开课日/有效期/每周时间/课时）后会自动排出；也可点上方「＋ 手动添加课次」。</span></div>`; return; }
   // 未初始化 → 默认展开当月；已展开但当月已无课次(如数据变化)→ 回退到当月或最后一月；用户主动收起(null)则保持全收
   if (__openMonth === undefined || (__openMonth && !groups[__openMonth])) __openMonth = groups[curYM] ? curYM : yms[yms.length - 1];
   wrap.innerHTML = yms.map(ym => {
@@ -2868,40 +2929,14 @@ function addSessionForm(pkgId) {
       document.getElementById('asSave').onclick = async () => {
         if (!val('asDate')) return toast('请选择日期');
         try {
-          await api(`/packages/${pkgId}/sessions`, { method: 'POST', body: { plannedDate: val('asDate'), start: val('asStart'), end: val('asEnd'), status: pickVal('#asStatus'), note: val('asNote') } });
+          await api(`/packages/${pkgId}/sessions`, { method: 'POST', body: { plannedDate: val('asDate'), start: val('asStart'), end: val('asEnd'), status: pickVal('#asStatus'), note: val('asNote'), manual: true } });
           await refresh(); pkgDetail(pkgId); toast('已添加课次');
         } catch (e) { toast(e.message); }
       };
     });
 }
 
-async function genSessions(pkgId) {
-  if (!needRole('package')) return;
-  const p = S.data.packages.find(x => x.id === pkgId);
-  if (!(p.schedule || []).length) return toast('请先在「编辑课包」里设置每周固定上课时间');
-  try {
-    const r = await api(`/packages/${pkgId}/generate`, { method: 'POST' });
-    await refresh();
-    pkgDetail(pkgId);
-    toast(`已排好课次，共 ${r.data.sessions.length} 节`);
-  } catch (e) { toast(e.message); }
-}
-
-// 重排未来待上课次到新周几（仅改未来、不动历史已上课）
-async function rescheduleFuture(pkgId) {
-  if (!needRole('package', '重排未来课次需要管理员权限')) return;
-  const p = S.data.packages.find(x => x.id === pkgId);
-  if (!(p.schedule || []).length) return toast('请先在「编辑课包」里设置每周固定上课时间');
-  confirmBox('重排未来课次',
-    '把还没上的课次（待上课）按当前「每周固定上课时间」重新排到对应的星期，已上课的历史课次不动。确定吗？',
-    async () => {
-      try {
-        const r = await api(`/packages/${pkgId}/reschedule-future`, { method: 'POST' });
-        await refresh(); pkgDetail(pkgId);
-        toast(r.moved ? `已重排 ${r.moved} 节未来课次 ✅` : '没有需要重排的未来课次');
-      } catch (e) { toast(e.message); }
-    });
-}
+// （课次现由「保存课包」时自动按最新排期重算，已移除「生成/补充」「重排未来」两个手动按钮及其入口函数）
 
 async function delSession(pkgId, sid) {
   if (!needRole('package', '删除课次需要管理员权限')) return;
@@ -3208,6 +3243,7 @@ function rollPkgForm(id) {
 async function rollPkg(id, targetGradeId, termId) {
   const p = S.data.packages.find(x => x.id === id);
   if (!p) return;
+  if (p.rolledHours) return toast('该课包已结转到新年级，无需重复结转');
   const st = p.stats || {};
   const remain = st.remain || 0;
   if (remain <= 0) return toast('该课包没有剩余课时');
@@ -3228,6 +3264,7 @@ async function rollPkg(id, targetGradeId, termId) {
     endDate: term ? term.end : '',
     note: (p.note ? p.note + '\n' : '') + `由「${fromName}」的「${p.name}」结转，剩余 ${remain} 课时`,
     status: 'active', leaveRule: p.leaveRule || 'keep',
+    fromRoll: id, fromRollHours: remain,   // 来源：旧课包结转，新课包可用课时 = 结转课时
     schedule: sched.map(s => ({ weekday: Number(s.weekday), start: s.start, end: s.end || endFromStart(s.start, dur) })),
     sessions: []
   };
@@ -3235,7 +3272,7 @@ async function rollPkg(id, targetGradeId, termId) {
     window.__SAVING = true;
     const r = await api('/packages', { method: 'POST', body: newBody });
     const newId = r.data.id;
-    await api('/packages/' + id, { method: 'PUT', body: { status: 'done', note: (p.note ? p.note + '\n' : '') + `已结转 ${remain} 课时至「${tg.name}」` } });
+    await api('/packages/' + id, { method: 'PUT', body: { status: 'done', rolledHours: remain, rolledTo: newId, rolledAt: today(), note: (p.note ? p.note + '\n' : '') + `已结转 ${remain} 课时至「${tg.name}」` } });
     await refresh();
     await switchGrade(tg.id);   // 切到新年级（内部 refresh + closeSheet + toast）
     pkgDetail(newId);
@@ -3943,7 +3980,7 @@ function renderTop() {
 
   const wp = termWeekOf(today());
   const d = new Date();
-  $('#tbSub').textContent = `${d.getMonth() + 1}月${d.getDate()}日 ${WD[d.getDay()]} · ${wp.term ? wp.term.name + ' ' : ''}第${wp.week > 0 && wp.week < 60 ? wp.week : '—'}周`;
+  $('#tbSub').textContent = `${d.getMonth() + 1}月${d.getDate()}日 ${WD[d.getDay()]} · ${wp.term ? wp.term.name + ' ' : ''}第${wp.week > 0 && wp.week < 60 ? wp.week : '—'}周 · v${APP_VERSION}`;
 
   const cs = todayCourses();
   const todo = gHomeworks().filter(h => h.status !== 'done').length;
@@ -3959,8 +3996,9 @@ function renderTop() {
 }
 
 function renderVersion() {
-  const html = `<b>${esc(S.data.family.name || '我们家')} · 星光伴学屋</b><br>
-    <span>v${S.meta.version} · build ${S.meta.build}</span>`;
+  const cl = (S.data && S.data.changelog && S.data.changelog[0]) || null;
+  const html = `<b>${esc((S.data && S.data.family && S.data.family.name) || '我们家')} · 星光伴学屋</b><br>
+    <span>v${APP_VERSION} · 更新于 ${BUILD_TIME}${cl ? '（' + esc(cl.date) + '）' : ''}</span>`;
   ['#ver1', '#ver2', '#ver3', '#ver4', '#ver5'].forEach(s => { const e = $(s); if (e) e.innerHTML = html; });
 }
 
