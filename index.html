@@ -594,8 +594,8 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.27';
-const BUILD_NO = '20260829d';
+const APP_VERSION = '1.0.28';
+const BUILD_NO = '20260829e';
 const BUILD_TIME = '2026-08-29';
 const HOUSEHOLD_ID = 'default';
 
@@ -979,6 +979,7 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [],
     changelog: [
+      { version: '1.0.28', date: '2026-08-29', items: ['学员权限扩展到 4 项：记作业（可编辑）、作业打卡、记录辅导课上课（可撤销误记）、录成绩', '新增 attend 权限位：学员记上课后只能撤销「已上课」，不能碰请假/调课/取消/删除课次', '删除作业、删除成绩、删除课次、调课、请假、增删课包、改课表、家庭设置仍严格归管理员'] },
       { version: '1.0.27', date: '2026-08-29', items: ['作业区改版：顶部 14 天日期条（本周一→下周日，带每日数量徽标，自动定位到今天，点击直达当天）', '作业按「逾期 / 今天 / 明天 / 具体某天 / 更远 / 未设截止日 / 某天已完成」分组折叠，逾期+今天+明天默认展开', '已完成按打卡日倒序看最近 3 天，可一键「查看更早」'] },
       { version: '1.0.26', date: '2026-08-29', items: ['作业条目与详情显示「哪天的什么课」（星期+时间+课程名/课包名）', '课包列表卡片补上开课日期', '每日评价「态度/方法/努力」各加一句说明'] },
       { version: '1.0.25', date: '2026-08-29', items: ['课包改期后自动同步已导入的辅导课：星期、起止时间、老师、机构、联系方式', '修复「改星期导致辅导课被误删」；增减排课天数自动补建/删除', '未导入过的课包仍不自动新建辅导课'] },
@@ -1235,7 +1236,7 @@ const S = {
   page: 'timetable',
   token: (getHashParam('ac') || localStorage.getItem('sm_token') || ''),
   who: localStorage.getItem('sm_who') || '',
-  role: '',            // 当前使用者角色：admin(管理员) / child(二类·打卡+录成绩) / viewer(三类·只读)
+  role: '',            // 当前使用者角色：admin(管理员) / child(二类·记作业+打卡+记上课+录成绩) / viewer(三类·只读)
   ttView: 'week',
   ttWeek: 'all',
   ttWeekOffset: 0,   // 课表「看第几周」偏移（0=当周），左右滑动改变
@@ -1246,27 +1247,30 @@ const S = {
 /* ---------- 角色 / 权限 ---------- */
 // 角色语义（与「我的→家庭成员」里的权限一致）：
 //   admin  = 一类管理员：可编辑全部
-//   child  = 二类学员：仅「打卡(作业完成)」+「录入成绩」，其余只读
+//   child  = 二类学员：记作业 + 作业打卡 + 记录辅导课上课 + 录入成绩；删除/调课/请假/课包与课程设置仍归管理员
 //   viewer = 三类访客：全部只读
 const ROLE_INFO = {
   admin: { t: '管理员', sub: '可编辑全部', cls: 'b', tier: '一类' },
-  child: { t: '学员', sub: '可打卡 · 录成绩', cls: 'g', tier: '二类' },
+  child: { t: '学员', sub: '记作业 · 打卡 · 记上课 · 录成绩', cls: 'g', tier: '二类' },
   viewer: { t: '访客', sub: '只读查看', cls: 'gy', tier: '三类' }
 };
 const roleInfo = r => ROLE_INFO[r] || ROLE_INFO.viewer;
 const roleLabel = r => { const o = roleInfo(r); return `${o.t} · ${o.sub}`; };
 
 // 某个操作是否允许当前角色执行
-//   course  课程/课表/作息/批量录入（管理员）
-//   homework 记作业/编辑作业（管理员）
-//   checkin 作业打卡（管理员 + 二类）
-//   exam    录入/编辑成绩（管理员 + 二类）
-//   package 课包/课次管理（管理员）
-//   settings 家庭/成员/年级/提醒/数据（管理员）
+//   course   课程/课表/作息/批量录入     （管理员）
+//   homework 记作业 / 编辑作业           （管理员 + 学员；删除作业仅管理员）
+//   checkin  作业打卡                    （管理员 + 学员）
+//   attend   记录辅导课上课 / 撤销误记   （管理员 + 学员）
+//   exam     录入 / 编辑成绩             （管理员 + 学员；删除成绩仅管理员）
+//   package  课包增删改、手动加课次、调课/请假/取消/删除课次（管理员）
+//   settings 家庭/成员/年级/提醒/数据     （管理员）
+// 学员可做的「增 / 改」，不含任何破坏性或改变排课的操作
+const CHILD_SCOPES = ['homework', 'checkin', 'attend', 'exam'];
 function canEdit(scope) {
   const role = S.role || 'viewer';
   if (role === 'admin') return true;
-  if (role === 'child') return scope === 'checkin' || scope === 'exam';
+  if (role === 'child') return CHILD_SCOPES.indexOf(scope) >= 0;
   return false;
 }
 // 进入编辑前的权限闸门：无权限时提示并返回 false
@@ -2700,7 +2704,7 @@ function hwDetail(id) {
   `;
   const foot = x.status === 'done'
     ? (canEdit('checkin')
-        ? `<button class="btn ghost" onclick="toggleCheck('${x.id}');closeSheet()">取消打卡</button>${canEdit('homework') ? `<button class="btn warn" onclick="delHW('${x.id}')">删除</button>` : ''}`
+        ? `<button class="btn ghost" onclick="toggleCheck('${x.id}');closeSheet()">取消打卡</button>${isAdmin() ? `<button class="btn warn" onclick="delHW('${x.id}')">删除</button>` : ''}`
         : `<button class="btn ghost" onclick="closeSheet()">关闭</button>`)
     : `${canEdit('homework') ? `<button class="btn ghost" onclick="hwForm('${x.id}')">编辑</button>` : ''}${canEdit('checkin') ? `<button class="btn ok" id="ckSave">✓ 完成打卡</button>` : (canEdit('homework') ? '' : `<button class="btn ghost" onclick="closeSheet()">关闭</button>`)}`;
   openSheet('作业详情', body, foot, () => {
@@ -2728,7 +2732,8 @@ async function addCkImg() {
   document.getElementById('ckImgs').innerHTML = window._ckImgs.map(u => `<img src="${u}">`).join('');
 }
 function delHW(id) {
-  if (!needRole('homework', '删除作业需要管理员权限')) return;
+  // 删除是破坏性操作：学员可记/改作业，但删除仅限管理员
+  if (!isAdmin()) { toast('删除作业需要管理员权限'); return; }
   confirmBox('删除作业', '确定删除这条作业记录吗？', async () => {
     try { await api('/homeworks/' + id, { method: 'DELETE' }); await refresh(); closeSheet(); toast('已删除'); }
     catch (e) { toast(e.message); }
@@ -3081,23 +3086,65 @@ function sessionActions(pkgId, sid) {
       ${lv && s.makeupOf ? `<p class="muted" style="margin-top:6px">已安排补课</p>` : ''}
     </div>
     <div class="sec-h"><div class="sec-t">操作</div></div>
-    ${canEdit('package') ? `<div class="card" style="display:flex;flex-direction:column;gap:9px">
-      ${sc ? `<button class="btn ok" onclick="sessAction('${pkgId}','${sid}','attend',{note:'已上课'})">✅ 标记已上课（扣 ${s.hours || p.hoursEach || 1} 课时）</button>` : ''}
-      ${sc ? `<button class="btn yan" onclick="sessAction('${pkgId}','${sid}','leave',{note:'请假'})">🙋 请假</button>` : ''}
-      ${sc ? `<button class="btn fu" onclick="rescheduleForm('${pkgId}','${sid}')">↪ 调课</button>` : ''}
-      ${sc ? `<button class="btn ghost" onclick="sessAction('${pkgId}','${sid}','cancel')">✕ 取消这节课</button>` : ''}
-      ${lv ? `<button class="btn fu" onclick="makeupForm('${pkgId}','${sid}')">🔁 安排补课</button>` : ''}
-      ${lv ? `<button class="btn yan" onclick="sessAction('${pkgId}','${sid}','postpone')">⏩ 一键顺延补课</button>` : ''}
-      ${(at || lv || mk || s.status === 'no') ? `<button class="btn ghost" onclick="sessAction('${pkgId}','${sid}','undo')">↩ 改回待上课</button>` : ''}
-      <button class="btn warn ghost" style="align-self:flex-start" onclick="delSession('${pkgId}','${sid}')">🗑 删除该课次</button>
-    </div>`
-    : `<div class="card center"><span class="muted">当前身份仅可查看，课次管理请联系管理员</span></div>`}`;
+    ${sessOpsHTML(p, s)}`;
   const foot = `<button class="btn ghost" onclick="pkgDetail('${pkgId}')">返回课包</button>`;
   openSheet('课次详情', body, foot);
 }
 
+/** 课次操作区：三档权限
+ *  · 管理员（package）：全部，含请假 / 调课 / 取消 / 安排补课 / 顺延 / 删除
+ *  · 学员（attend）：仅「记录已上课」与「撤销误记的已上课」，其他不给
+ *  · 访客：只读提示 */
+function sessOpsHTML(p, s) {
+  const pid = p.id, sid = s.id;
+  const hrs = s.hours || p.hoursEach || 1;
+  const btn = (cls, fn, tx, st) => `<button class="btn ${cls}"${st ? ` style="${st}"` : ''} onclick="${fn}">${tx}</button>`;
+  const wrap = (inner) => `<div class="card" style="display:flex;flex-direction:column;gap:9px">${inner}</div>`;
+
+  if (canEdit('package')) {
+    let o = '';
+    if (s.status === 'sc') {
+      o += btn('ok', `sessAction('${pid}','${sid}','attend',{note:'已上课'})`, `✅ 标记已上课（扣 ${hrs} 课时）`);
+      o += btn('yan', `sessAction('${pid}','${sid}','leave',{note:'请假'})`, '🙋 请假');
+      o += btn('fu', `rescheduleForm('${pid}','${sid}')`, '↪ 调课');
+      o += btn('ghost', `sessAction('${pid}','${sid}','cancel')`, '✕ 取消这节课');
+    }
+    if (s.status === 'lv') {
+      o += btn('fu', `makeupForm('${pid}','${sid}')`, '🔁 安排补课');
+      o += btn('yan', `sessAction('${pid}','${sid}','postpone')`, '⏩ 一键顺延补课');
+    }
+    if (s.status !== 'sc') o += btn('ghost', `sessAction('${pid}','${sid}','undo')`, '↩ 改回待上课');
+    o += btn('warn ghost', `delSession('${pid}','${sid}')`, '🗑 删除该课次', 'align-self:flex-start');
+    return wrap(o);
+  }
+
+  if (canEdit('attend')) {
+    if (s.status === 'sc') {
+      return wrap(btn('ok', `sessAction('${pid}','${sid}','attend',{note:'已上课'})`, `✅ 记录已上课（扣 ${hrs} 课时）`)) +
+        `<p class="muted" style="margin-top:8px">💡 你还可以撤销误记的「已上课」。请假、调课、删除课次需要管理员操作。</p>`;
+    }
+    if (s.status === 'at') {
+      return wrap(btn('ghost', `sessAction('${pid}','${sid}','undo')`, '↩ 撤销上课记录（改回待上课）')) +
+        `<p class="muted" style="margin-top:8px">💡 记错了可以撤销重来。请假、调课、删除课次需要管理员操作。</p>`;
+    }
+    return `<div class="card center"><span class="muted">这节课当前是「${(SESSION[s.status] || SESSION.sc).t}」状态，无需你操作。<br>需要调整请联系管理员。</span></div>`;
+  }
+
+  return `<div class="card center"><span class="muted">当前身份仅可查看，课次管理请联系管理员</span></div>`;
+}
+
 async function sessAction(pkgId, sid, action, extra = {}) {
-  if (!needRole('package')) return;
+  // 按动作定权限：记录上课 / 撤销误记 学员可做；请假 / 调课 / 取消 / 顺延 / 补课 归管理员
+  const scope = (action === 'attend' || action === 'undo') ? 'attend' : 'package';
+  if (!needRole(scope)) return;
+  const p = S.data.packages.find(x => x.id === pkgId);
+  const s = p ? (p.sessions || []).find(x => x.id === sid) : null;
+  if (!p || !s) return;
+  // 学员的「撤销」只能撤回自己误记的已上课，不能把管理员的请假 / 取消 / 补课改回去
+  if (S.role === 'child' && action === 'undo' && s.status !== 'at') {
+    toast('学员只能撤销「已上课」的记录，其他状态请联系管理员');
+    return;
+  }
   const map = { attend: '已记录上课', leave: '已请假', cancel: '已取消', undo: '已改回待上课', postpone: '已安排顺延补课', makeup: '已安排补课', reschedule: '已调课' };
   try {
     await api(`/packages/${pkgId}/sessions/${sid}/action`, { method: 'POST', body: { action, ...extra } });
@@ -3739,7 +3786,7 @@ function examDetail(id) {
     `${canEdit('exam') ? `<button class="btn ghost" onclick="examForm('${e.id}')">✏️ 编辑</button>` : ''}${isAdmin() ? `<button class="btn warn" onclick="delExam('${e.id}')">🗑 删除</button>` : ''}`);
 }
 function delExam(id) {
-  if (!needRole('admin', '删除成绩需要管理员权限')) return;
+  if (!isAdmin()) { toast('删除成绩需要管理员权限'); return; }
   confirmBox('删除成绩', '确定删除这条成绩记录吗？', async () => {
     try { await api('/exams/' + id, { method: 'DELETE' }); await refresh(); closeSheet(); toast('已删除'); }
     catch (e) { toast(e.message); }
@@ -3964,7 +4011,8 @@ function memberForm(id) {
   openSheet(m ? '编辑成员' : '添加成员',
     `${fInput('mfName', '称呼', m ? m.name : '', '如：爸爸 / 外婆', 'text', true)}
      ${fPick('mfAva', '头像', avatars, m ? m.avatar : '👨', 'sm')}
-     ${fPick('mfRole', '权限', [{ v: 'admin', t: '管理员（可编辑全部）' }, { v: 'viewer', t: '访客（只读查看）' }, { v: 'child', t: '学员（可打卡 · 录成绩）' }], m ? m.role : 'admin')}`,
+     ${fPick('mfRole', '权限', [{ v: 'admin', t: '管理员（可编辑全部）' }, { v: 'viewer', t: '访客（只读查看）' }, { v: 'child', t: '学员（记作业 · 打卡 · 记上课 · 录成绩）' }], m ? m.role : 'admin')}
+     <p class="muted" style="margin:-4px 0 10px;font-size:11.5px;line-height:1.6">学员可：记作业并编辑、作业打卡、记录辅导课上课（可撤销误记）、录入成绩。<br>不能：删除作业、请假 / 调课 / 删除课次、增删课包、改课程课表、改家庭设置。</p>`,
     `${m ? `<button class="btn warn" onclick="delMember('${m.id}')">删除</button>` : ''}
      <button class="btn" id="mfSave">保存</button>`,
     () => {
