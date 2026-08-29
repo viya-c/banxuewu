@@ -561,8 +561,8 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.24';
-const BUILD_NO = '20260829';
+const APP_VERSION = '1.0.25';
+const BUILD_NO = '20260829b';
 const BUILD_TIME = '2026-08-29';
 const HOUSEHOLD_ID = 'default';
 
@@ -946,6 +946,7 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [],
     changelog: [
+      { version: '1.0.25', date: '2026-08-29', items: ['课包改期后自动同步已导入的辅导课：星期、起止时间、老师、机构、联系方式', '修复「改星期导致辅导课被误删」；增减排课天数自动补建/删除', '未导入过的课包仍不自动新建辅导课'] },
       { version: '1.0.24', date: '2026-08-29', items: ['修复课包课次 bug：改开课日提前时自动补齐历史缺口（不再漏排）', '新生成课次不再误标「调课」（rescheduled=false）', '保留已处理/手动/调课课次，消耗不受影响'] },
       { version: '1.0.23', date: '2026-08-28', items: ['课表「某天某课」一键布置作业：预填课程类型/课程/科目/日期，免重选', '结转新年级：旧包剩余课时归零并记录结转量，新课包可用课时=结转课时', '核查课包改日期/星期/时间不影响已记录课时消耗'] },
       { version: '1.0.22', date: '2026-08-28', items: ['课包保存后自动按最新「开课日/有效期/每周时间/课时」重算全部课次（移除「生成/补充」「重排未来」手动按钮）', '首页展示版本号与更新时间', '统一各区域字体大小'] },
@@ -3025,20 +3026,50 @@ function readSched() {
  *  - 课包里去掉的星期：删除对应的关联课程
  *  辅导课必须先在「课程」表单里「从课包导入」手动创建，这里只同步已存在的关联课程，
  *  直接在内存改完再一次性 commit，避免多次整文件上传互相踩 SHA 导致「数据冲突」与卡顿 */
+/**
+ * 课包信息变更后，把「已导入到课表」的辅导课对齐到最新排期：
+ * 星期 / 起止时间 / 科目 / 老师 / 机构 / 联系方式。
+ * 未导入过的课包保持「不自动新建」，仍需用户在「课程」表单里「从课包导入」。
+ * 注：开课日/有效期由 courseInPkgRange() 按周动态生效，无需同步到课程。
+ */
 function syncLinkedCourses(pkg, meta) {
   const courses = S.data.courses || (S.data.courses = []);
   const linked = courses.filter(c => c.packageId === pkg.id && c.type === 'tutor');
-  const sched = pkg.schedule || [];
-  const schedDays = sched.map(s => Number(s.weekday));
+  if (!linked.length) return;            // 还没导入过 → 不自动新建，尊重手动导入
   const dur = pkg.durationMin || 90;
-  for (const slot of sched) {
+  const slots = (pkg.schedule || []).slice().sort((a, b) => Number(a.weekday) - Number(b.weekday));
+  const list = linked.slice().sort((a, b) => Number(a.weekday) - Number(b.weekday));
+  const tpl = list[0];
+  slots.forEach((slot, i) => {
     const wd = Number(slot.weekday);
     const e = slot.end || endFromStart(slot.start, dur);
-    const exist = linked.find(c => Number(c.weekday) === wd);
-    if (exist) { exist.startTime = slot.start; exist.endTime = e; }
-    // 不再自动新建：辅导课由用户在「课程」表单「从课包导入」手动创建
+    const c = list[i];
+    if (!c) {
+      // 排课天数变多：以已导入课程为模板，补建缺失的星期（该课包已导入过，属用户主动选择）
+      courses.push({
+        id: uid('c'), gradeId: tpl.gradeId, type: 'tutor', packageId: pkg.id,
+        subject: pkg.subject || tpl.subject, name: pkg.name,
+        teacher: pkg.teacher || '', org: pkg.org || '', teacherContact: pkg.teacherContact || '',
+        location: tpl.location || '', color: tpl.color,
+        termId: tpl.termId || null, weekType: tpl.weekType || 'all',
+        weekday: wd, periodIdx: null, startTime: slot.start, endTime: e,
+        note: '', createdAt: new Date().toISOString()
+      });
+      return;
+    }
+    // 已导入课程：对齐到课包最新排期（改星期/改时间都会同步，不再被误删）
+    c.weekday = wd; c.startTime = slot.start; c.endTime = e;
+    c.subject = pkg.subject || c.subject;
+    c.name = pkg.name;
+    c.teacher = pkg.teacher || '';
+    c.org = pkg.org || '';
+    c.teacherContact = pkg.teacherContact || '';
+  });
+  // 排课天数变少：删除多出来的已导入课程
+  for (let i = slots.length; i < list.length; i++) {
+    const idx = courses.findIndex(x => x.id === list[i].id);
+    if (idx >= 0) courses.splice(idx, 1);
   }
-  for (const c of linked) { if (schedDays.indexOf(Number(c.weekday)) < 0) { const i = courses.findIndex(x => x.id === c.id); if (i >= 0) courses.splice(i, 1); } }
 }
 /** 仅更新「未来待上课次」的起止时间，不动日期与星期——用于「同星期、只改上课时间」的场景 */
 function updateFutureTimes(pkg, sched) {
