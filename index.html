@@ -275,6 +275,16 @@ img{max-width:100%;display:block}
 .hw-g.tdy .hw-g-hd{background:linear-gradient(120deg,#EAF1FF,#F6F9FF);border-color:rgba(91,140,255,.38)}
 .hw-more{display:block;width:100%;padding:11px;border:1px dashed var(--bd);border-radius:13px;background:#fff;color:var(--tx2);font-size:12.5px;font-weight:700;margin-bottom:10px}
 
+/* ---------- 作业记录 K 线图（成绩页） ---------- */
+.kl-wrap{overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.kl-wrap::-webkit-scrollbar{display:none}
+.kl-wrap svg{display:block}
+.kl-lg{display:flex;gap:11px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:4px;font-size:10.5px;color:var(--tx2);font-weight:600}
+.kl-lg span{display:flex;align-items:center;gap:4px}
+.kl-lg i{width:9px;height:9px;border-radius:2px;display:inline-block;flex:0 0 auto}
+.kl-lg i.hollow{border:1.2px solid #C9D1E6;background:transparent}
+.kl-lg i.line{width:13px;height:2.5px;border-radius:2px;background:#6E9BFF}
+
 /* 进度条 */
 .bar{height:8px;border-radius:8px;background:#EEF1F9;overflow:hidden;margin-top:7px}
 .bar i{display:block;height:100%;border-radius:8px;transition:width .5s cubic-bezier(.3,1,.4,1)}
@@ -594,9 +604,9 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.28';
-const BUILD_NO = '20260829e';
-const BUILD_TIME = '2026-08-29';
+const APP_VERSION = '1.0.29';
+const BUILD_NO = '20260830a';
+const BUILD_TIME = '2026-08-30';
 const HOUSEHOLD_ID = 'default';
 
 /* ---------------------------- 工具 ---------------------------- */
@@ -613,7 +623,8 @@ function endFromStart(start, durMin) { return minToHm(hmToMin(start) + (Number(d
 function ymd(d) { d = d instanceof Date ? d : new Date(d); if (isNaN(d)) return ''; const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; }
 
 /* ---------------------------- 常量 ---------------------------- */
-const COLLECTIONS = ['members', 'grades', 'courses', 'packages', 'homeworks', 'exams', 'checkins', 'dailyRatings'];
+// points = 积分「使用」流水（获得分不落库，按作业打卡 + 每日评价实时算出，避免重复记账）
+const COLLECTIONS = ['members', 'grades', 'courses', 'packages', 'homeworks', 'exams', 'checkins', 'dailyRatings', 'points'];
 
 /* ---------------------------- 学年 / 学期 ---------------------------- */
 function schoolYearRange(sy) {
@@ -977,8 +988,9 @@ function defaultData() {
       },
       subjects: ['语文', '数学', '英语', '科学', '体育', '音乐', '美术', '道法', '信息', '奥数', '书法', '编程', '钢琴', '游泳', '舞蹈', '其他']
     },
-    courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [],
+    courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.29', date: '2026-08-30', items: ['成绩页新增「作业记录」：蜡烛图看每天的作业量 / 完成量，折线看当天积分，可切 7 天 / 14 天 / 30 天 / 本学期', '积分体系：完成 1 个作业 +1 分，每日评价「态度/方法/努力」每项 ≥4 星 各 +2 分', '积分总账显示总积分 / 生效积分 / 失效积分；家长可登记「使用积分」，用掉的部分转为失效'] },
       { version: '1.0.28', date: '2026-08-29', items: ['学员权限扩展到 4 项：记作业（可编辑）、作业打卡、记录辅导课上课（可撤销误记）、录成绩', '新增 attend 权限位：学员记上课后只能撤销「已上课」，不能碰请假/调课/取消/删除课次', '删除作业、删除成绩、删除课次、调课、请假、增删课包、改课表、家庭设置仍严格归管理员'] },
       { version: '1.0.27', date: '2026-08-29', items: ['作业区改版：顶部 14 天日期条（本周一→下周日，带每日数量徽标，自动定位到今天，点击直达当天）', '作业按「逾期 / 今天 / 明天 / 具体某天 / 更远 / 未设截止日 / 某天已完成」分组折叠，逾期+今天+明天默认展开', '已完成按打卡日倒序看最近 3 天，可一键「查看更早」'] },
       { version: '1.0.26', date: '2026-08-29', items: ['作业条目与详情显示「哪天的什么课」（星期+时间+课程名/课包名）', '课包列表卡片补上开课日期', '每日评价「态度/方法/努力」各加一句说明'] },
@@ -1172,7 +1184,7 @@ function reconcile(DB) {
 
     // 示例 / 清空 / 导出 / 导入
     if (seg[0] === 'demo' && method === 'POST') { const g = currentGrade(state); if (!g) return { ok: false, error: '请先创建年级' }; seedDemo(state, g.id); migrateGrades(state); await commit(); return ok({ ok: true }); }
-    if (seg[0] === 'clear' && method === 'POST') { const g = currentGrade(state); if (!g) return { ok: false, error: '没有可清空的年级' }; state.courses = state.courses.filter(c => c.gradeId !== g.id); state.packages = state.packages.filter(p => p.gradeId !== g.id); state.homeworks = state.homeworks.filter(h => h.gradeId !== g.id); state.exams = state.exams.filter(e => e.gradeId !== g.id); await commit(); return ok({ ok: true }); }
+    if (seg[0] === 'clear' && method === 'POST') { const g = currentGrade(state); if (!g) return { ok: false, error: '没有可清空的年级' }; state.courses = state.courses.filter(c => c.gradeId !== g.id); state.packages = state.packages.filter(p => p.gradeId !== g.id); state.homeworks = state.homeworks.filter(h => h.gradeId !== g.id); state.exams = state.exams.filter(e => e.gradeId !== g.id); state.points = (state.points || []).filter(p => p.gradeId !== g.id); await commit(); return ok({ ok: true }); }
     if (seg[0] === 'export' && method === 'GET') return ok(state);
     if (seg[0] === 'import' && method === 'POST') { if (!body || !Array.isArray(body.grades)) return { ok: false, error: '备份文件格式不正确' }; S.data = reconcile(body); S.data.version = APP_VERSION; await commit(); return ok({ ok: true }); }
 
@@ -1195,7 +1207,7 @@ function reconcile(DB) {
         }
         await commit(); return ok(col === 'packages' ? { ...list[i], stats: packageStats(list[i]) } : list[i]);
       }
-      if (method === 'DELETE' && seg[1]) { const i = list.findIndex(x => x.id === seg[1]); if (i < 0) return { ok: false, error: '记录不存在' }; const [removed] = list.splice(i, 1); if (col === 'grades') { state.courses = state.courses.filter(c => c.gradeId !== removed.id); state.packages = state.packages.filter(p => p.gradeId !== removed.id); state.homeworks = state.homeworks.filter(h => h.gradeId !== removed.id); state.exams = state.exams.filter(e => e.gradeId !== removed.id); if (removed.current && state.grades[0]) state.grades[0].current = true; } if (col === 'grades' || col === 'homeworks') { state.checkins = state.checkins.filter(c => state.homeworks.some(h => h.id === c.homeworkId)); } if (col === 'courses') state.homeworks.forEach(h => { if (h.courseId === removed.id) h.courseId = null; }); await commit(); return ok(removed); }
+      if (method === 'DELETE' && seg[1]) { const i = list.findIndex(x => x.id === seg[1]); if (i < 0) return { ok: false, error: '记录不存在' }; const [removed] = list.splice(i, 1); if (col === 'grades') { state.courses = state.courses.filter(c => c.gradeId !== removed.id); state.packages = state.packages.filter(p => p.gradeId !== removed.id); state.homeworks = state.homeworks.filter(h => h.gradeId !== removed.id); state.exams = state.exams.filter(e => e.gradeId !== removed.id); state.points = (state.points || []).filter(p => p.gradeId !== removed.id); if (removed.current && state.grades[0]) state.grades[0].current = true; } if (col === 'grades' || col === 'homeworks') { state.checkins = state.checkins.filter(c => state.homeworks.some(h => h.id === c.homeworkId)); } if (col === 'courses') state.homeworks.forEach(h => { if (h.courseId === removed.id) h.courseId = null; }); await commit(); return ok(removed); }
     }
 
     return { ok: false, error: '接口不存在：/api' + path };
@@ -3613,8 +3625,9 @@ function renderExams() {
   if (!all.length) {
     box.innerHTML = seg + `<div class="card"><div class="empty"><span class="em">📈</span>
       <p>还没有考试记录<br>${canEdit('exam') ? '每次考完录一下分数，<br>自动生成成绩曲线，进步一目了然' : '请联系管理员或孩子的身份录入成绩'}</p>
-      ${canEdit('exam') ? `<button class="btn" style="margin-top:14px" onclick="examForm()">记录第一次成绩</button>` : ''}</div></div>`;
+      ${canEdit('exam') ? `<button class="btn" style="margin-top:14px" onclick="examForm()">记录第一次成绩</button>` : ''}</div></div>` + hwStatsHTML();
     bindTermSeg();
+    bindHwRange();
     return;
   }
 
@@ -3667,8 +3680,11 @@ function renderExams() {
     </div>`;
   }).join('');
 
+  h += hwStatsHTML();
+
   box.innerHTML = seg + h;
   bindTermSeg();
+  bindHwRange();
 }
 
 const hasScore = e => e.score !== null && e.score !== undefined && e.score !== '';
@@ -3680,6 +3696,235 @@ function prevExam(all, e) {
   return i > 0 ? same[i - 1] : null;
 }
 function pickSubject(s) { S.examSubject = s; renderExams(); }
+
+/* ---------- 作业记录 · 积分（蜡烛柱 + 积分折线） ----------
+   口径：作业数量 = 当天「到期」的作业数（今天该做多少）
+         完成数量 = 当天「打卡」完成的作业数（今天实际做了多少）
+   积分：完成 1 个作业 +1（记在打卡那天）；每日评价「态度/方法/努力」每项 ≥4 星 各 +2（记在评价那天）
+         「获得」不落库，实时算出，避免重复记账；「使用」落 points 流水，用掉的部分转为失效积分 */
+const PT_PER_HW = 1;      // 每完成一个作业
+const PT_PER_RATE = 2;    // 评价每项达标
+const RATE_PASS = 4;      // 达标星数（含）
+const RATE_LABEL = { att: '态度', meth: '方法', eff: '努力' };
+let HW_RANGE = '14';      // '7' | '14' | '30' | 'term'
+const HW_RANGES = [{ v: '7', t: '7天' }, { v: '14', t: '14天' }, { v: '30', t: '30天' }, { v: 'term', t: '本学期' }];
+const shiftDate = (ds, n) => { const d = new Date(ds + 'T00:00:00'); d.setDate(d.getDate() + n); return ymd(d); };
+
+/** 单日：到期作业数 / 打卡完成数 / 评价达标项 / 当天积分 */
+function hwDayStat(hws, d) {
+  const dueN = hws.filter(x => x.dueDate === d).length;
+  const doneN = hws.filter(x => x.status === 'done' && (x.checkinAt || '').slice(0, 10) === d).length;
+  const dr = (S.data.dailyRatings || []).find(r => r.gradeId === gid() && r.date === d);
+  const rateHit = dr ? ['att', 'meth', 'eff'].filter(k => Number(dr[k]) >= RATE_PASS) : [];
+  const ratePt = rateHit.length * PT_PER_RATE;
+  return { date: d, dueN, doneN, rateHit, ratePt, points: doneN * PT_PER_HW + ratePt };
+}
+
+/** 积分总账（全时段，不受图表范围影响） */
+function pointsSummary() {
+  const hws = gHomeworks();
+  const earnHW = hws.filter(x => x.status === 'done' && x.checkinAt).length * PT_PER_HW;
+  const earnRate = (S.data.dailyRatings || []).filter(r => r.gradeId === gid())
+    .reduce((s, r) => s + ['att', 'meth', 'eff'].filter(k => Number(r[k]) >= RATE_PASS).length * PT_PER_RATE, 0);
+  const total = earnHW + earnRate;
+  const used = (S.data.points || []).filter(p => p.gradeId === gid())
+    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  return { earnHW, earnRate, total, used, live: Math.max(0, total - used) };
+}
+
+/** 图表要展示的日期序列（升序，末尾是今天） */
+function hwRangeDays() {
+  const t = today();
+  let start;
+  if (HW_RANGE === 'term') {
+    const ts = curGradeTerms();
+    const tt = ts.find(x => x.id === curTerm()) || activeTermOf(t) || null;
+    start = (tt && tt.start) || (curGrade() && curGrade().startDate) || '';
+    if (!start) start = shiftDate(t, -29);
+    if (start > t) start = t;
+    if (relDays(start) < -180) start = shiftDate(t, -29);   // 起始日过远（如学年起点）→ 回落 30 天
+  } else {
+    start = shiftDate(t, -(Number(HW_RANGE) - 1));
+  }
+  const out = [];
+  let d = start, guard = 0;
+  while (d <= t && guard++ < 400) { out.push(d); d = shiftDate(d, 1); }
+  return out;
+}
+
+/** 蜡烛柱（作业量 / 完成量）+ 积分折线 */
+function hwKLineSVG(days) {
+  const n = days.length;
+  if (!n) return '<p class="muted center">暂无数据</p>';
+  const W = 340, H = 200, L = 26, R = 32, T = 14, B = 32;
+  const PW = W - L - R, slot = PW / n;
+  const bw = Math.max(2.5, Math.min(22, slot * 0.6));
+
+  const maxDue = Math.max(1, ...days.map(d => Math.max(d.dueN, d.doneN)));
+  const yHi = Math.max(4, Math.ceil(maxDue * 1.15));
+  const maxPt = Math.max(1, ...days.map(d => d.points));
+  const pHi = Math.max(4, Math.ceil(maxPt * 1.2));
+  const Y = v => T + (1 - v / yHi) * (H - T - B);
+  const YP = v => T + (1 - v / pHi) * (H - T - B);
+  const cx = i => L + slot * i + slot / 2;
+
+  let g = '';
+  // 网格 + 左轴（作业数）+ 右轴（积分），共用 4 条线
+  for (let i = 0; i <= 4; i++) {
+    const y = T + (H - T - B) * i / 4, f = 1 - i / 4;
+    g += `<line x1="${L}" y1="${y.toFixed(1)}" x2="${W - R}" y2="${y.toFixed(1)}" stroke="#EDF1F9" stroke-width="1"/>
+      <text x="${L - 4}" y="${(y + 3).toFixed(1)}" font-size="8" fill="#9AA3BC" text-anchor="end">${Math.round(yHi * f)}</text>
+      <text x="${W - R + 4}" y="${(y + 3).toFixed(1)}" font-size="8" fill="#6E9BFF" text-anchor="start">${Math.round(pHi * f)}</text>`;
+  }
+  g += `<text x="${L - 4}" y="${T - 4}" font-size="7.5" fill="#C2C9DC" text-anchor="end">作业</text>
+        <text x="${W - R + 4}" y="${T - 4}" font-size="7.5" fill="#6E9BFF" text-anchor="start">积分</text>`;
+
+  // 蜡烛：空心框=当天到期作业数，实心柱=当天完成数，虚线上影=未完成缺口
+  const yBase = Y(0);
+  days.forEach((d, i) => {
+    const x0 = cx(i) - bw / 2, yDue = Y(d.dueN), yDone = Y(d.doneN);
+    const full = d.dueN > 0 && d.doneN >= d.dueN;
+    const part = d.doneN > 0 && d.doneN < d.dueN;
+    const col = full ? '#25C685' : part ? '#FFB05C' : '#D6DDEE';
+    if (d.dueN > 0) g += `<rect x="${x0.toFixed(1)}" y="${yDue.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, yBase - yDue).toFixed(1)}" fill="none" stroke="#C9D1E6" stroke-width="1" rx="1"/>`;
+    if (d.doneN > 0) g += `<rect x="${x0.toFixed(1)}" y="${yDone.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, yBase - yDone).toFixed(1)}" fill="${col}" opacity=".88" rx="1"/>`;
+    if (d.dueN > d.doneN && d.dueN > 0) {
+      g += `<line x1="${cx(i).toFixed(1)}" y1="${yDone.toFixed(1)}" x2="${cx(i).toFixed(1)}" y2="${yDue.toFixed(1)}" stroke="#FF7EB3" stroke-width="1.1" stroke-dasharray="2 1.6"/>`;
+    }
+  });
+
+  // 积分折线（右轴）
+  const pts = days.map((d, i) => ({ x: cx(i), y: YP(d.points) }));
+  g += `<path d="${pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}" fill="none" stroke="#6E9BFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>`;
+  pts.forEach((p, i) => { if (days[i].points > 0) g += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.3" fill="#fff" stroke="#6E9BFF" stroke-width="1.6"/>`; });
+
+  // X 轴日期
+  const step = n <= 14 ? 1 : n <= 31 ? 2 : Math.ceil(n / 6);
+  days.forEach((d, i) => {
+    if (i % step !== 0 && i !== n - 1) return;
+    const dt = new Date(d.date + 'T00:00:00');
+    g += `<text x="${cx(i).toFixed(1)}" y="${H - B + 14}" font-size="7.5" fill="#9AA3BC" text-anchor="middle">${dt.getMonth() + 1}/${dt.getDate()}</text>`;
+    if (i === n - 1) g += `<text x="${cx(i).toFixed(1)}" y="${H - B + 24}" font-size="7" fill="#6E9BFF" text-anchor="middle" font-weight="700">今天</text>`;
+  });
+
+  // 透明热区放最后（覆盖在最上层，方便点窄柱看当天明细）
+  days.forEach((d, i) => {
+    g += `<rect x="${(L + slot * i).toFixed(1)}" y="${T}" width="${slot.toFixed(1)}" height="${(H - T - B).toFixed(1)}" fill="transparent" style="cursor:pointer" onclick="hwDayDetail('${d.date}')"/>`;
+  });
+
+  return `<div class="kl-wrap"><svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="作业量与积分">${g}</svg>
+    <div class="kl-lg">
+      <span><i style="background:#25C685"></i>全部完成</span>
+      <span><i style="background:#FFB05C"></i>部分完成</span>
+      <span><i class="hollow"></i>当天作业量</span>
+      <span><i class="line"></i>当天积分</span>
+    </div>
+    <p class="muted center" style="font-size:10.5px;margin-top:5px">点柱子看当天明细</p></div>`;
+}
+
+function hwDayDetail(d) {
+  const s = hwDayStat(gHomeworks(), d);
+  const rd = relDays(d);
+  const name = rd === 0 ? '今天' : rd === -1 ? '昨天' : rd === -2 ? '前天' : fmtDate(d);
+  toast(`${name}：作业 ${s.dueN} 项 · 完成 ${s.doneN} 项 · 积分 +${s.points}` +
+    (s.rateHit.length ? `（${s.rateHit.map(k => RATE_LABEL[k]).join('、')}达标）` : ''));
+}
+
+/** 成绩页第二块：作业记录 + 积分 */
+function hwStatsHTML() {
+  const hws = gHomeworks();
+  const days = hwRangeDays();
+  const stats = days.map(d => hwDayStat(hws, d));
+  const sum = pointsSummary();
+  const hasAny = sum.total > 0 || stats.some(s => s.dueN || s.doneN);
+
+  if (!hasAny) {
+    return `<div class="sec-h" style="margin-top:20px"><div class="sec-t">📊 作业记录</div></div>
+      <div class="card"><div class="empty" style="padding:24px"><span class="em">📊</span>
+      <p>还没有作业与积分数据<br>完成作业打卡后，这里会出现每天的作业量、完成量和积分曲线</p></div></div>`;
+  }
+
+  let h = `<div class="sec-h" style="margin-top:20px"><div class="sec-t">📊 作业记录 <small>作业量 · 完成量 · 积分</small></div>
+    ${isAdmin() ? `<button class="btn xs warn" onclick="pointUseForm()">− 使用积分</button>` : ''}</div>`;
+
+  h += `<div class="stat3">
+    <div><b style="color:var(--main)">${sum.total}</b><span>总积分</span></div>
+    <div><b style="color:var(--ok)">${sum.live}</b><span>生效积分</span></div>
+    <div><b style="color:var(--mu)">${sum.used}</b><span>失效积分（已用）</span></div>
+  </div>`;
+
+  h += `<p class="muted" style="margin:-4px 2px 10px;font-size:11.5px;line-height:1.65">
+    每完成 1 个作业 <b>+${PT_PER_HW}</b> 分（记在打卡那天）；每日评价「态度 / 方法 / 努力」每项 ≥${RATE_PASS} 星 各 <b>+${PT_PER_RATE}</b> 分。<br>
+    累计获得 ${sum.total} 分 = 作业 ${sum.earnHW} + 评价 ${sum.earnRate}；已使用 ${sum.used} 分（失效），剩 ${sum.live} 分可用。</p>`;
+
+  h += `<div class="seg" id="hwRangeSeg" style="margin:2px 0 10px">${HW_RANGES.map(r =>
+    `<button data-v="${r.v}" class="${HW_RANGE === r.v ? 'on' : ''}">${r.t}</button>`).join('')}</div>`;
+
+  h += `<div class="chart-card">${hwKLineSVG(stats)}</div>`;
+
+  const uses = (S.data.points || []).filter(p => p.gradeId === gid())
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  if (uses.length) {
+    h += `<div class="sec-h"><div class="sec-t" style="font-size:13.5px;color:var(--mu)">🎁 积分使用 <small>${uses.length} 笔 · 共 ${sum.used} 分</small></div></div>`;
+    h += uses.map(p => {
+      const click = isAdmin() ? ` onclick="pointUseForm('${p.id}')"` : '';
+      return `<div class="card"${click}><div class="row"><div class="col grow">
+        <b style="font-size:14px">−${Number(p.amount) || 0} 分 · ${esc(p.note || '未填用途')}</b>
+        <span class="muted">${fmtDate(p.date)}${p.by ? ' · ' + esc(p.by) : ''}</span></div>
+        <span class="tag gy">已失效</span></div></div>`;
+    }).join('');
+  }
+  return h;
+}
+const bindHwRange = () => {
+  const el = document.getElementById('hwRangeSeg');
+  if (el) el.onclick = e => { const b = e.target.closest('button'); if (b) { HW_RANGE = b.dataset.v; renderExams(); } };
+};
+
+/* ---------- 积分使用（管理员专属，使用后转为失效积分） ---------- */
+function pointUseForm(id) {
+  if (!isAdmin()) { toast('使用积分需要管理员权限'); return; }
+  const p = id ? (S.data.points || []).find(x => x.id === id) : null;
+  const sum = pointsSummary();
+  const d = p || { date: today(), amount: '', note: '' };
+  openSheet(p ? '编辑使用记录' : '使用积分',
+    `<div class="card" style="margin-bottom:12px;background:#F7F9FE">
+      <div class="pkg-num" style="margin-top:0">
+        <div><b class="ok">${sum.live}</b>生效积分</div>
+        <div><b>${sum.total}</b>总积分</div>
+        <div><b style="color:var(--mu)">${sum.used}</b>已失效</div>
+      </div>
+    </div>
+    ${fInput('ptAmount', '使用积分', d.amount, '如：20', 'number', true)}
+    ${fInput('ptNote', '用途', d.note, '如：兑换乐高 / 看动画片 30 分钟', 'text', true)}
+    ${fInput('ptDate', '日期', d.date, '', 'date')}
+    <p class="muted" style="margin-top:8px">💡 使用后会从「生效积分」里扣掉，扣掉的部分记为「失效积分」，不影响总积分。</p>`,
+    `${p ? `<button class="btn warn ghost" onclick="delPoint('${p.id}')">🗑 删除</button>` : ''}
+     <button class="btn ghost" onclick="closeSheet()">取消</button><button class="btn warn" id="ptSave">${p ? '保存' : '确认使用'}</button>`,
+    () => {
+      document.getElementById('ptSave').onclick = async () => {
+        const amount = Math.round(Number(val('ptAmount')) || 0);
+        const note = val('ptNote').trim();
+        const date = val('ptDate') || today();
+        if (!(amount > 0)) return toast('请填写使用积分（大于 0）');
+        if (!note) return toast('请填写用途，方便以后对账');
+        const avail = sum.live + (p ? (Number(p.amount) || 0) : 0);
+        if (amount > avail) return toast(`生效积分不足，当前可用 ${avail} 分`);
+        try {
+          if (p) await api('/points/' + p.id, { method: 'PUT', body: { amount, note, date } });
+          else await api('/points', { method: 'POST', body: { gradeId: gid(), termId: curTerm() || null, amount, note, date, by: S.who } });
+          await refresh(); closeSheet(); toast(p ? '已更新' : `已使用 ${amount} 分 🎁`);
+        } catch (e) { toast(e.message); }
+      };
+    });
+}
+async function delPoint(id) {
+  if (!isAdmin()) { toast('删除记录需要管理员权限'); return; }
+  confirmBox('删除使用记录', '删除后这部分积分会重新变回「生效」状态，确定吗？', async () => {
+    try { await api('/points/' + id, { method: 'DELETE' }); await refresh(); closeSheet(); toast('已删除，积分已恢复'); }
+    catch (e) { toast(e.message); }
+  });
+}
 
 /* ---------- SVG 曲线 ---------- */
 function chartSVG(allRaw, cur) {
