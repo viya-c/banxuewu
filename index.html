@@ -186,6 +186,7 @@ img{max-width:100%;display:block}
 .rate-edit{background:#F7F9FE;border-radius:12px;padding:10px 12px;margin-bottom:10px}
 .rate-line{display:flex;align-items:center;gap:8px;margin:6px 0}
 .rate-lab{width:58px;flex:0 0 auto;font-size:13px;color:var(--tx2);font-weight:700}
+.rate-tip{margin:-1px 0 7px 66px;font-size:11px;color:var(--mu);line-height:1.5}
 .st-row{flex:1;display:flex;align-items:center}
 .st-stars{cursor:pointer;font-size:18px;letter-spacing:2px;line-height:1}
 .st-stars.ro{cursor:default}
@@ -241,6 +242,38 @@ img{max-width:100%;display:block}
 .hw-meta{display:flex;gap:7px;align-items:center;margin-top:4px;flex-wrap:wrap;font-size:11px;color:var(--mu)}
 .hw-imgs{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap}
 .hw-imgs img{width:52px;height:52px;object-fit:cover;border-radius:9px;border:1px solid var(--bd)}
+
+/* ---------- 作业：14天日期条 + 按日期分组 ---------- */
+.hw-bar{display:flex;gap:7px;overflow-x:auto;padding:2px 2px 8px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.hw-bar::-webkit-scrollbar{display:none}
+.hw-day{flex:0 0 auto;width:50px;padding:7px 0 6px;border-radius:13px;background:#fff;border:1.5px solid var(--bd);text-align:center;cursor:pointer;transition:.15s}
+.hw-day:active{transform:scale(.94)}
+.hw-day .w{display:block;font-size:11px;font-weight:700;color:var(--tx2)}
+.hw-day .d{display:block;font-size:13px;font-weight:800;color:var(--tx1);margin-top:1px}
+.hw-day .n{display:inline-block;min-width:15px;height:15px;line-height:15px;border-radius:8px;font-size:9.5px;font-weight:800;color:#fff;background:var(--main);margin-top:3px;padding:0 3px}
+.hw-day .n.warn{background:var(--warn)}
+.hw-day .n.hide{visibility:hidden}
+.hw-day.today{background:var(--main);border-color:var(--main);box-shadow:0 3px 10px rgba(91,140,255,.3)}
+.hw-day.today .w,.hw-day.today .d{color:#fff}
+.hw-day.today .n{background:#fff;color:var(--main)}
+.hw-day.today .n.warn{color:var(--warn)}
+.hw-day.on{border-color:var(--main);box-shadow:0 0 0 2px rgba(91,140,255,.18)}
+.hw-g{margin-bottom:9px}
+.hw-g-hd{display:flex;align-items:center;gap:8px;padding:10px 13px;background:var(--card);border:1px solid var(--bd);border-radius:13px;cursor:pointer;box-shadow:var(--sh);min-height:44px}
+.hw-g-hd:active{transform:scale(.995)}
+.hw-g-hd b{font-size:14px;font-weight:800;color:var(--tx)}
+.hw-g-hd .muted{font-size:11.5px}
+.hw-g-hd .ar{margin-left:auto;color:var(--mu);font-size:12px;transition:transform .2s}
+.hw-g.open .hw-g-hd{border-radius:13px 13px 0 0;border-bottom:none}
+.hw-g.open .hw-g-hd .ar{transform:rotate(90deg)}
+.hw-g-bd{background:var(--card);border:1px solid var(--bd);border-top:none;border-radius:0 0 13px 13px;padding:7px 7px 0;box-shadow:var(--sh)}
+.hw-g:not(.open) .hw-g-bd{display:none}
+.hw-g-bd .hw{margin-bottom:7px;padding:9px 11px;border-radius:11px}
+.hw-g-bd .hw:last-child{margin-bottom:7px}
+.hw-g.ov .hw-g-hd{background:linear-gradient(120deg,#FFF1F3,#FFF8F9);border-color:rgba(255,90,110,.42)}
+.hw-g.ov .hw-g-hd b{color:var(--warn)}
+.hw-g.tdy .hw-g-hd{background:linear-gradient(120deg,#EAF1FF,#F6F9FF);border-color:rgba(91,140,255,.38)}
+.hw-more{display:block;width:100%;padding:11px;border:1px dashed var(--bd);border-radius:13px;background:#fff;color:var(--tx2);font-size:12.5px;font-weight:700;margin-bottom:10px}
 
 /* 进度条 */
 .bar{height:8px;border-radius:8px;background:#EEF1F9;overflow:hidden;margin-top:7px}
@@ -561,8 +594,8 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.25';
-const BUILD_NO = '20260829b';
+const APP_VERSION = '1.0.27';
+const BUILD_NO = '20260829d';
 const BUILD_TIME = '2026-08-29';
 const HOUSEHOLD_ID = 'default';
 
@@ -946,6 +979,8 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [],
     changelog: [
+      { version: '1.0.27', date: '2026-08-29', items: ['作业区改版：顶部 14 天日期条（本周一→下周日，带每日数量徽标，自动定位到今天，点击直达当天）', '作业按「逾期 / 今天 / 明天 / 具体某天 / 更远 / 未设截止日 / 某天已完成」分组折叠，逾期+今天+明天默认展开', '已完成按打卡日倒序看最近 3 天，可一键「查看更早」'] },
+      { version: '1.0.26', date: '2026-08-29', items: ['作业条目与详情显示「哪天的什么课」（星期+时间+课程名/课包名）', '课包列表卡片补上开课日期', '每日评价「态度/方法/努力」各加一句说明'] },
       { version: '1.0.25', date: '2026-08-29', items: ['课包改期后自动同步已导入的辅导课：星期、起止时间、老师、机构、联系方式', '修复「改星期导致辅导课被误删」；增减排课天数自动补建/删除', '未导入过的课包仍不自动新建辅导课'] },
       { version: '1.0.24', date: '2026-08-29', items: ['修复课包课次 bug：改开课日提前时自动补齐历史缺口（不再漏排）', '新生成课次不再误标「调课」（rescheduled=false）', '保留已处理/手动/调课课次，消耗不受影响'] },
       { version: '1.0.23', date: '2026-08-28', items: ['课表「某天某课」一键布置作业：预填课程类型/课程/科目/日期，免重选', '结转新年级：旧包剩余课时归零并记录结转量，新课包可用课时=结转课时', '核查课包改日期/星期/时间不影响已记录课时消耗'] },
@@ -2322,16 +2357,224 @@ function nextCourse() {
   return todayCourses().find(c => toMin(c._t.start) > now) || null;
 }
 
+/* ---------- 作业区：14 天日期条 + 按日期分组 ----------
+   解决「今天有什么 / 明天有什么 / 前天完成了什么 / 这周还剩什么」全看不出来的问题：
+   顶部横向日期条（本周一→下周日共 14 天，可滑动、自动定位到今天、带每日数量徽标），
+   下方按「逾期 / 今天 / 明天 / 具体某天 / 更远 / 未设截止日 / 已完成某天」分组折叠展示。 */
+// 折叠态：HW_OPEN[分组key]=true/false；未记录过的 key 走默认展开规则（逾期+今天+明天）
+let HW_OPEN = {};
+let HW_MORE_DONE = false;   // 是否已展开「更早的已完成」
+let HW_PICK = '';           // 日期条当前选中的日期，空表示默认选今天
+
+/** 逾期判定（口径单点维护，分组与卡片共用）：未完成 + 有截止日 + 截止时间已过；缺 dueTime 按当天 23:59 算 */
+const hwOverdue = (x) => x.status !== 'done' && !!x.dueDate &&
+  (x.dueDate + ' ' + (x.dueTime || '23:59')) < (today() + ' ' + nowHM());
+
+/** 日期条覆盖：本周一 → 下周日，共 14 天 */
+function hw14Days() {
+  const first = mondayOf(today());
+  const out = [];
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(first + 'T00:00:00');
+    d.setDate(d.getDate() + i);
+    out.push(ymd(d));
+  }
+  return out;
+}
+
+/** 分组标题里的日期文案：今天 / 明天 / 昨天 / 周三 8月20日 */
+function hwDayTitle(d) {
+  const rd = relDays(d);
+  if (rd === 0) return '今天';
+  if (rd === 1) return '明天';
+  if (rd === -1) return '昨天';
+  if (rd === 2) return '后天';
+  if (rd === -2) return '前天';
+  const dt = new Date(d + 'T00:00:00');
+  return `${WD[dt.getDay()]} ${dt.getMonth() + 1}月${dt.getDate()}日`;
+}
+
+/** 分组 key → 合法 DOM id（key 含冒号，需转义） */
+const hwGid = (key) => 'hwg-' + String(key).replace(/[^a-zA-Z0-9_-]/g, '_');
+
+/** 分组是否展开：用户手点过以 HW_OPEN 为准，否则走默认（逾期 / 今天 / 明天 展开，其余折叠） */
+function hwGroupOpen(g) {
+  if (Object.prototype.hasOwnProperty.call(HW_OPEN, g.key)) return !!HW_OPEN[g.key];
+  return !!g.defOpen;
+}
+
+/** 把作业切成有序分组。返回 { defs:[{key,title,sub,tone,items,defOpen}], hiddenN, pendN } */
+function hwGroupDefs(hws) {
+  const days = hw14Days();
+  const winEnd = days[days.length - 1];
+  const t = today();
+  const ov = [], day = {}, far = [], nod = [];
+  const doneDay = {}, doneNone = [];
+
+  (hws || []).forEach(x => {
+    if (x.status === 'done') {
+      const k = (x.checkinAt || '').slice(0, 10);
+      if (k) (doneDay[k] = doneDay[k] || []).push(x); else doneNone.push(x);
+      return;
+    }
+    if (!x.dueDate) { nod.push(x); return; }
+    if (hwOverdue(x)) { ov.push(x); return; }          // 今天已过截止时间的也归逾期
+    if (x.dueDate > winEnd) { far.push(x); return; }   // 超出 14 天窗口
+    (day[x.dueDate] = day[x.dueDate] || []).push(x);
+  });
+
+  const byDue = (a, b) => (a.dueDate + (a.dueTime || '23:59')).localeCompare(b.dueDate + (b.dueTime || '23:59'));
+  const byDone = (a, b) => (b.checkinAt || '').localeCompare(a.checkinAt || '');
+  const defs = [];
+  let pendN = 0;
+
+  if (ov.length) {
+    pendN += ov.length;
+    defs.push({
+      key: 'ov', tone: 'ov', defOpen: true,
+      title: '⚠️ 逾期未完成', sub: `${ov.length} 项 · 已过截止时间`,
+      items: ov.slice().sort(byDue)
+    });
+  }
+  Object.keys(day).sort().forEach(d => {
+    const rd = relDays(d);
+    pendN += day[d].length;
+    defs.push({
+      key: 'd:' + d, tone: rd === 0 ? 'tdy' : '', defOpen: rd === 0 || rd === 1,
+      title: `${rd === 0 ? '📌' : rd === 1 ? '🌅' : '🗓'} ${hwDayTitle(d)}`,
+      sub: `${day[d].length} 项${rd === 0 ? ' · 今天要做完' : rd === 1 ? ' · 提前了解' : rd < 0 ? ' · 已过去未完成' : ''}`,
+      items: day[d].slice().sort(byDue)
+    });
+  });
+  if (far.length) {
+    pendN += far.length;
+    defs.push({ key: 'far', tone: '', defOpen: false, title: '🗓 更远的安排', sub: `${far.length} 项 · 两周以后`, items: far.slice().sort(byDue) });
+  }
+  if (nod.length) {
+    pendN += nod.length;
+    defs.push({ key: 'nod', tone: '', defOpen: false, title: '📋 未设截止日', sub: `${nod.length} 项`, items: nod });
+  }
+
+  // 已完成按「打卡日」倒序（不是截止日），默认只显示最近 3 个有完成记录的日期
+  const doneKeys = Object.keys(doneDay).sort().reverse();
+  const showAll = HW_MORE_DONE || (doneKeys.length + (doneNone.length ? 1 : 0)) <= 3;
+  const shownKeys = showAll ? doneKeys : doneKeys.slice(0, 3);
+  shownKeys.forEach(k => {
+    defs.push({
+      key: 'c:' + k, tone: '', defOpen: false,
+      title: `✅ ${hwDayTitle(k)}已完成`, sub: `${doneDay[k].length} 项`,
+      items: doneDay[k].slice().sort(byDone)
+    });
+  });
+  if (showAll && doneNone.length) {
+    defs.push({ key: 'c:', tone: '', defOpen: false, title: '✅ 更早完成', sub: `${doneNone.length} 项 · 无打卡时间`, items: doneNone });
+  }
+  const hiddenN = showAll ? 0
+    : doneKeys.slice(3).reduce((s, k) => s + doneDay[k].length, 0) + doneNone.length;
+  return { defs, hiddenN, pendN };
+}
+
+/** 顶部 14 天日期条：每天显示未完成数（红色=含逾期）或已完成数（绿） */
+function hwDateBarHTML(hws) {
+  const t = today();
+  const pend = {}, done = {};
+  (hws || []).forEach(x => {
+    if (x.status === 'done') {
+      const k = (x.checkinAt || '').slice(0, 10);
+      if (k) done[k] = (done[k] || 0) + 1;
+      return;
+    }
+    if (!x.dueDate) return;
+    const p = (pend[x.dueDate] = pend[x.dueDate] || { n: 0, ov: 0 });
+    p.n++;
+    if (hwOverdue(x)) p.ov++;
+  });
+  const chips = hw14Days().map(d => {
+    const dt = new Date(d + 'T00:00:00');
+    const p = pend[d] || { n: 0, ov: 0 };
+    const dn = done[d] || 0;
+    const isT = d === t;
+    const cls = ['hw-day'];
+    if (isT) cls.push('today');
+    if (HW_PICK ? HW_PICK === d : isT) cls.push('on');
+    const badge = p.n ? `<span class="n${p.ov ? ' warn' : ''}">${p.n}</span>`
+      : dn ? `<span class="n" style="background:var(--ok)">${dn}</span>`
+        : `<span class="n hide">0</span>`;
+    return `<div class="${cls.join(' ')}" data-d="${d}" onclick="hwPickDay('${d}')">
+      <span class="w">${isT ? '今天' : WD_S[dt.getDay()]}</span>
+      <span class="d">${dt.getMonth() + 1}/${dt.getDate()}</span>${badge}</div>`;
+  }).join('');
+  return `<div class="hw-bar" id="hwBar">${chips}</div>`;
+}
+
+/** 单个分组：body 始终渲染（CSS 控制显隐），折叠时纯 classList 切换，不重渲染、不丢滚动位置 */
+function hwGroupHTML(g) {
+  const open = hwGroupOpen(g);
+  return `<div class="hw-g ${g.tone || ''} ${open ? 'open' : ''}" id="${hwGid(g.key)}">
+    <div class="hw-g-hd" onclick="hwToggleGroup('${g.key}')">
+      <b>${g.title}</b><span class="muted">${g.sub}</span><span class="ar">▸</span>
+    </div>
+    <div class="hw-g-bd">${g.items.map(x => hwItemHTML(x)).join('')}</div>
+  </div>`;
+}
+
+/** 作业区整块：日期条 + 分组列表 + 查看更早 */
+function hwSectionHTML(hws) {
+  if (!hws.length) {
+    return `<div class="card"><div class="empty" style="padding:24px"><span class="em">🎈</span>
+      <p>${canEdit('homework') ? '还没有作业记录<br>老师布置作业后，点上方「+ 记作业」添加' : '还没有作业记录 🎈'}</p></div></div>`;
+  }
+  const G = hwGroupDefs(hws);
+  // 剪枝：切年级/学期或数据变化后，清掉已不存在的分组 key
+  const alive = {};
+  G.defs.forEach(g => { alive[g.key] = 1; });
+  Object.keys(HW_OPEN).forEach(k => { if (!alive[k]) delete HW_OPEN[k]; });
+  if (HW_MORE_DONE && !G.defs.some(g => g.key.charAt(0) === 'c')) HW_MORE_DONE = false;
+
+  let h = hwDateBarHTML(hws);
+  h += G.defs.map(g => hwGroupHTML(g)).join('');
+  if (G.hiddenN > 0) h += `<button class="hw-more" onclick="hwShowMoreDone()">查看更早的 ${G.hiddenN} 项 ▾</button>`;
+  return h;
+}
+
+function hwToggleGroup(key) {
+  const el = document.getElementById(hwGid(key));
+  if (!el) return;
+  const open = !el.classList.contains('open');
+  HW_OPEN[key] = open;
+  el.classList.toggle('open', open);
+}
+
+/** 点日期条：高亮当天 + 展开对应分组并平滑滚动过去（只用 scrollTo，避免 scrollIntoView 带动整页跳动） */
+function hwPickDay(d) {
+  HW_PICK = d;
+  const bar = document.getElementById('hwBar');
+  if (bar) bar.querySelectorAll('.hw-day').forEach(el => el.classList.toggle('on', el.getAttribute('data-d') === d));
+  const keyD = 'd:' + d, keyC = 'c:' + d;
+  let el = document.getElementById(hwGid(keyD)), key = keyD;
+  if (!el) { el = document.getElementById(hwGid(keyC)); key = keyC; }
+  if (!el) { toast('这天没有作业安排'); return; }
+  if (!el.classList.contains('open')) { HW_OPEN[key] = true; el.classList.add('open'); }
+  const top = el.getBoundingClientRect().top + (window.pageYOffset || document.documentElement.scrollTop || 0) - 68;
+  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+}
+
+function hwShowMoreDone() { HW_MORE_DONE = true; renderToday(); }
+
+/** 首次渲染把「今天」滚到日期条可视区（只改 scrollLeft） */
+function hwScrollDateBar() {
+  const bar = document.getElementById('hwBar');
+  if (!bar) return;
+  const el = bar.querySelector('.hw-day.today') || bar.querySelector('.hw-day.on');
+  if (!el) return;
+  bar.scrollLeft = el.offsetLeft - bar.clientWidth / 2 + el.offsetWidth / 2;
+}
+
 function renderToday() {
   const box = document.getElementById('todayBody');
   const cs = todayCourses();
   const hws = gHomeworks();
-  const t = today();
   const now = toMin(nowHM());
-
-  // 待办：未完成的（含逾期）+ 今天完成的
-  const todo = hws.filter(h => h.status !== 'done').sort((a, b) => (a.dueDate + (a.dueTime || '')).localeCompare(b.dueDate + (b.dueTime || '')));
-  const doneToday = hws.filter(h => h.status === 'done' && (h.checkinAt || '').slice(0, 10) === t);
 
   let h = '';
 
@@ -2356,28 +2599,30 @@ function renderToday() {
   // 每日评价（态度/方法/努力，每天一次）
   h += renderDailyRating();
 
-  // 作业
-  h += `<div class="sec-h"><div class="sec-t">📝 作业打卡 <small>${todo.length} 项待完成</small></div>
+  // 作业：14 天日期条 + 按日期分组（看今天/明天/前天完成/本周剩余）
+  const pend = hws.filter(x => x.status !== 'done').length;
+  h += `<div class="sec-h"><div class="sec-t">📝 作业打卡 <small>${pend} 项待完成</small></div>
     ${canEdit('homework') ? `<button class="btn xs" onclick="hwForm()">+ 记作业</button>` : ''}</div>`;
-  if (!todo.length && !doneToday.length) {
-    h += `<div class="card"><div class="empty" style="padding:24px"><span class="em">🎈</span>
-      <p>${canEdit('homework') ? '没有待完成的作业<br>老师布置作业后，点右上「记作业」添加' : '没有待完成的作业 🎈'}</p></div></div>`;
-  } else {
-    h += todo.map(x => hwItemHTML(x)).join('');
-    if (doneToday.length) {
-      h += `<div class="sec-h"><div class="sec-t" style="font-size:13.5px;color:var(--mu)">✅ 今日已完成 <small>${doneToday.length} 项</small></div></div>`;
-      h += doneToday.map(x => hwItemHTML(x)).join('');
-    }
-  }
+  h += hwSectionHTML(hws);
 
   box.innerHTML = (gradeHasTerms() ? termSegHTML() : '') + h;
   bindTermSeg();
+  hwScrollDateBar();
 }
 
 function hwItemHTML(x, compact) {
-  const overdue = x.status !== 'done' && x.dueDate && (x.dueDate + ' ' + (x.dueTime || '23:59')) < (today() + ' ' + nowHM());
+  const overdue = hwOverdue(x);
   const c = x.courseId ? S.data.courses.find(y => y.id === x.courseId) : null;
   const src = c ? c.type : (x.source || 'main');
+  // 关联的「哪天的什么课」：星期 + 上课时间 + 课程名（课包名）；未关联课程时退回布置日
+  let courseTx = '';
+  if (c) {
+    const pk = c.packageId ? S.data.packages.find(z => z.id === c.packageId) : null;
+    const ct = courseTime(c);
+    courseTx = `📚 ${WD[Number(c.weekday)]}${ct.start ? ' ' + ct.start : ''} ${esc(pk ? pk.name : courseTitle(c))}`;
+  } else if (x.assignDate) {
+    courseTx = `📅 ${WD[new Date(x.assignDate + 'T00:00:00').getDay()]}布置`;
+  }
   let due = '';
   if (x.dueDate) {
     const rd = relDays(x.dueDate);
@@ -2389,6 +2634,7 @@ function hwItemHTML(x, compact) {
     <div class="hw-main" onclick="hwDetail('${x.id}')">
       <div class="hw-t">${emojiOf(x.subject)} ${esc(x.title)}</div>
       <div class="hw-meta">
+        ${courseTx ? `<span style="color:var(--tx2);font-weight:600">${courseTx}</span>` : ''}
         <span class="tag ${TYPE_TAG[src]}">${TYPE_NAME[src]}</span>
         ${x.subject ? `<span>${esc(x.subject)}</span>` : ''}
         ${due ? `<span style="${overdue ? 'color:var(--warn);font-weight:700' : ''}">⏰ ${due}${overdue ? ' 已逾期' : ''}</span>` : ''}
@@ -2419,6 +2665,8 @@ function hwDetail(id) {
   const x = S.data.homeworks.find(y => y.id === id);
   if (!x) return;
   const c = x.courseId ? S.data.courses.find(y => y.id === x.courseId) : null;
+  // 关联的「哪天的什么课」：星期 + 上课时间 + 课程名（关联课包时显示课包名）
+  const cTx = c ? `${WD[Number(c.weekday)]}${courseTime(c).start ? ' ' + courseTime(c).start : ''} ${(c.packageId ? (S.data.packages.find(z => z.id === c.packageId) || {}).name : '') || courseTitle(c)}` : '';
   const doneCard = x.status === 'done' ? `<div class="card" style="margin-bottom:12px;border:1.5px solid rgba(37,198,133,.35)">
       <b style="color:var(--ok);font-size:14px">✅ 已完成打卡</b>
       <div class="muted" style="margin-top:4px">时间：${fmtDateTime(x.checkinAt)}${x.checkinBy ? ' · ' + esc(x.checkinBy) : ''}</div>
@@ -2442,7 +2690,7 @@ function hwDetail(id) {
       <b style="font-size:16.5px">${emojiOf(x.subject)} ${esc(x.title)}</b>
       <div class="hw-meta" style="margin-top:6px">
         <span class="tag ${TYPE_TAG[c ? c.type : (x.source || 'main')]}">${TYPE_NAME[c ? c.type : (x.source || 'main')]}</span>
-        ${c ? `<span>${esc(courseTitle(c))}</span>` : ''}
+        ${cTx ? `<span style="color:var(--tx2);font-weight:600">📚 ${esc(cTx)}</span>` : ''}
         <span>布置：${fmtDate(x.assignDate)}</span>
         ${x.dueDate ? `<span>截止：${fmtDate(x.dueDate)} ${x.dueTime || ''}</span>` : ''}
       </div>
@@ -2572,13 +2820,14 @@ function renderStarCards() {
 function renderDailyRating() {
   const d = ymd(new Date());
   const dr = dailyRatingFor(d);
-  const row = (name, lab) => `<div class="rate-line"><span class="rate-lab">${lab}</span>${starInput('dr_' + name, dr ? dr[name] : 0)}</div>`;
+  const row = (name, lab, tip) => `<div class="rate-line"><span class="rate-lab">${lab}</span>${starInput('dr_' + name, dr ? dr[name] : 0)}</div>
+      ${tip ? `<p class="rate-tip">${tip}</p>` : ''}`;
   return `<div class="daily-sec">
     <div class="daily-head">📅 每日评价 <small>${fmtDate(d)} · 态度 / 方法 / 努力，每天一次</small></div>
     <div class="rate-edit">
-      ${row('att', '态度')}
-      ${row('meth', '方法')}
-      ${row('eff', '努力')}
+      ${row('att', '态度', '主动进入学习状态：不用催、不拖延，坐得住、先自己思考')}
+      ${row('meth', '方法', '用对方法：先复习再做题，错题会归因，不盲目刷题')}
+      ${row('eff', '努力', '投入程度：专注时长够，遇到难题愿意多坚持一会儿')}
     </div>
     <button class="btn sm ok" id="drSave" onclick="saveDailyRatingClick()">${dr ? '更新今日评价' : '保存今日评价'}</button>
   </div>`;
@@ -2668,7 +2917,7 @@ function renderPackages() {
       ${schedTx ? `<p class="muted" style="margin-top:7px">📅 每周固定：${schedTx}</p>` : ''}
       ${nextS ? `<p class="muted">下一节：${fmtDateFull(nextS.plannedDate)} ${WD[Number(nextS.weekday)]} ${nextS.start}</p>` : ''}
       ${warn ? `<p style="font-size:11.5px;color:var(--warn);margin-top:6px;font-weight:600">⚠️ 剩余不足 ${low} 课时，记得提前决定是否续费</p>` : ''}
-      ${p.endDate ? `<p class="muted" style="margin-top:4px">有效期至 ${fmtDateFull(p.endDate)}${expSoon ? `（还剩${relDays(p.endDate)}天）` : ''}</p>` : ''}
+      ${(p.startDate || p.endDate) ? `<p class="muted" style="margin-top:4px">${p.startDate ? '🎬 开课 ' + fmtDateFull(p.startDate) : ''}${p.startDate && p.endDate ? ' · ' : ''}${p.endDate ? '有效期至 ' + fmtDateFull(p.endDate) + (expSoon ? `（还剩${relDays(p.endDate)}天）` : '') : ''}</p>` : ''}
     </div>`;
   }).join('');
 
