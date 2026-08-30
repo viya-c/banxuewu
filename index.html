@@ -625,8 +625,8 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.34';
-const BUILD_NO = '20260830f';
+const APP_VERSION = '1.0.35';
+const BUILD_NO = '20260830g';
 const BUILD_TIME = '2026-08-30';
 const HOUSEHOLD_ID = 'default';
 
@@ -1011,6 +1011,7 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.35', date: '2026-08-30', items: ['修复：课包每周各天上课时间不同时，「从课包导入」把所有天都套用成同一时间（现在按课包排课逐天设置，如周三 18:30-20:30、周六 10:00-12:00）', '导入表单新增提示：课包各天时间不同时会列出「周三 xx、周六 xx」，并说明保存时按排课分别设置', '编辑已关联的辅导课，换星期后时间输入框自动跟着课包排课变', '课包详情新增「⚠️ 上课时间与课包排课不一致」提示 + 「按课包排课修正」按钮，一键对齐历史遗留的错误时间（一次请求批量完成）'] },
       { version: '1.0.34', date: '2026-08-30', items: ['每日评价「态度/方法/努力」恢复信息更完整的原版说明（主动进入学习状态… / 用对方法… / 投入程度…）', '一行排版不再靠砍字，改用「去缩进用满整行 + 不换行 + 超出省略」保证；≤360px 窄屏再自动降半号，完整显示不截断'] },
       { version: '1.0.33', date: '2026-08-30', items: ['修复：没「从课包导入」过的课外辅导课包，其排课仍会自动出现在课表的「🎯 课外辅导」格子里（渲染层漏了「是否已导入」的判断）', '现在只有导入过的课包才会在课表显示；未导入的只在课包里管理课时，不会污染课表', '已导入课包的「补课 / 调课到别的星期」仍照常显示在真实日期上，不受影响'] },
       { version: '1.0.32', date: '2026-08-30', items: ['成绩区加「📈 考试成绩」标题，与下方「📊 作业记录」形成上下两块', '成绩明细改为每 5 条一页、左右滑动查看，底部带页码点与「第 x/y 页」（记录再多也不把页面拉长）', '成绩明细字号整体调小 2~3 号：科目 14.5→12、日期名次 12→10.5、分数球 17→14 且 48px→42px', '作业区去掉「⭐ 打卡星星 N 颗」卡片', '每日评价「态度/方法/努力」的说明改为固定占一行（去掉缩进用满整行 + 超出省略，绝不再折两行）'] },
@@ -1261,6 +1262,20 @@ function reconcile(DB) {
           });
           add++;
         }
+      }
+      // 按 id 精确更新（用于「按课包排课修正时间」这类批量对齐，同样只提交一次）
+      const ups = Array.isArray(body.updates) ? body.updates : [];
+      for (const u of ups) {
+        if (!u || !u.id) continue;
+        const i = state.courses.findIndex(x => x.id === u.id && x.gradeId === g.id);
+        if (i < 0) continue;
+        const patch = {};
+        ['startTime', 'endTime', 'weekday', 'periodIdx', 'subject', 'name', 'teacher', 'location'].forEach(k => {
+          if (u[k] !== undefined) patch[k] = u[k];
+        });
+        if (!Object.keys(patch).length) continue;
+        state.courses[i] = { ...state.courses[i], ...patch, updatedAt: new Date().toISOString() };
+        upd++;
       }
       await commit();
       return ok({ add, upd, del });
@@ -2225,22 +2240,48 @@ function courseForm(id, preset) {
   const foot = `<button class="btn ghost" onclick="closeSheet()">取消</button><button class="btn" id="cfSave">保存</button>`;
 
   openSheet(isEdit ? '编辑课程' : '添加课程', body, foot, () => {
+    const setV = (id, v) => { const el = document.getElementById(id); if (el) el.value = (v == null ? '' : v); };
+    /** 课包在 wd 这天的起止时间（各天可以不一样）；这天没排课就回退到第一段排课 */
+    const pkgTimeOf = (p, wd) => {
+      const sch = p.schedule || [];
+      const slot = sch.find(x => Number(x.weekday) === wd) || sch[0];
+      if (!slot) return null;
+      const dur = Number(p.durationMin) || 90;
+      const st = slot.start || '18:30';
+      return { start: st, end: slot.end || endFromStart(st, dur) };
+    };
+    /** 把课包在 wd 这天的时间填进时间输入框（供展示用；真正保存时按星期逐个取） */
+    const applyPkgTime = (p, wd) => {
+      const t = pkgTimeOf(p, wd);
+      if (!t) return;
+      setV('cfStart', t.start); setV('cfEnd', t.end);
+    };
+    /** 课包各天时间不同时，明确列出来，避免用户以为「只能一个时间」 */
+    const renderPkgSchedTip = (p) => {
+      const el = document.getElementById('cfSchedTip');
+      if (!el) return;
+      const sch = p.schedule || [];
+      const dur = Number(p.durationMin) || 90;
+      const tx = sch.map(sl => {
+        const st = sl.start || '18:30';
+        return WD[Number(sl.weekday)] + ' ' + st + '-' + (sl.end || endFromStart(st, dur));
+      });
+      const uniq = new Set(sch.map(sl => (sl.start || '') + '-' + (sl.end || endFromStart(sl.start || '18:30', dur))));
+      el.innerHTML = (sch.length > 1 && uniq.size > 1)
+        ? `<p class="muted" style="margin-top:6px">🕒 这个课包<b>各天上课时间不同</b>，保存时会按课包排课分别设置：<br>${tx.join('、')}</p>`
+        : '';
+    };
+
     // 选择「从课包导入」后，自动带出科目/名称/老师/地点/联系方式/时间/星期
     const fillCourseFromPkg = (pkgId) => {
       const p = gPackages().find(x => x.id === pkgId);
       if (!p) return;
-      const setV = (id, v) => { const el = document.getElementById(id); if (el) el.value = (v == null ? '' : v); };
       setV('cfSubject', p.subject);
       setV('cfName', p.name);
       setV('cfTeacher', p.teacher || '');
       setV('cfLocation', p.org || '');
       setV('cfTeacherContact', p.teacherContact || '');
       const sch = (p.schedule && p.schedule.length) ? p.schedule : [];
-      const dur = Number(p.durationMin) || 90;
-      const start = sch.length ? (sch[0].start || '18:30') : '18:30';
-      const end = (sch.length && sch[0].end) ? sch[0].end : endFromStart(start, dur);
-      setV('cfStart', start);
-      setV('cfEnd', end);
       const days = sch.map(s => Number(s.weekday));
       const dayBox = document.getElementById('cfDay');
       if (dayBox) dayBox.querySelectorAll('button').forEach(b => {
@@ -2248,6 +2289,9 @@ function courseForm(id, preset) {
         const on = isEdit ? (wd === days[0]) : (days.indexOf(wd) >= 0);
         b.classList.toggle('on', on);
       });
+      // 时间按当前选中的星期取，而不是固定取第一段排课
+      applyPkgTime(p, Number(pickVal('#cfDay')));
+      renderPkgSchedTip(p);
     };
     const renderTime = () => {
       const type = pickVal('#cfType');
@@ -2255,7 +2299,8 @@ function courseForm(id, preset) {
       if (type === 'tutor') {
         area.innerHTML = `<div class="f2">
           ${fInput('cfStart', '开始时间', d.startTime || '18:30', '', 'time', true)}
-          ${fInput('cfEnd', '结束时间', d.endTime || '20:00', '', 'time', true)}</div>`;
+          ${fInput('cfEnd', '结束时间', d.endTime || '20:00', '', 'time', true)}</div>
+          <div id="cfSchedTip"></div>`;
       } else {
         const arr = type === 'extend' ? s.extendPeriods : s.periods;
         area.innerHTML = fSelect('cfPeriod', '节次', arr.map((p, i) => ({ v: i, t: `${p.name}  ${p.start}-${p.end}` })), d.periodIdx, true);
@@ -2266,7 +2311,22 @@ function courseForm(id, preset) {
         + `<p class="muted" style="margin-top:6px">💡 关联课包后，上课星期/时间<b>以课包为准</b>、由系统自动同步，无需在此重复设置；要改时间请在课包里改即可。</p>`
       : '';
     const pkgSel = document.getElementById('cfPkg');
-    if (pkgSel) pkgSel.onchange = () => { if (pkgSel.value) fillCourseFromPkg(pkgSel.value); };
+    if (pkgSel) {
+      pkgSel.onchange = () => { if (pkgSel.value) fillCourseFromPkg(pkgSel.value); };
+      // 编辑已关联的辅导课：进来就把「各天时间不同」的提示显示出来
+      if (pkgSel.value) {
+        const p0 = gPackages().find(x => x.id === pkgSel.value);
+        if (p0) renderPkgSchedTip(p0);
+      }
+    }
+    // 编辑辅导课时换星期 → 时间输入框跟着课包排课走
+    const dayBox = document.getElementById('cfDay');
+    if (dayBox && isEdit) dayBox.addEventListener('click', () => setTimeout(() => {
+      const ps = document.getElementById('cfPkg');
+      if (!ps || !ps.value) return;
+      const p = gPackages().find(x => x.id === ps.value);
+      if (p) applyPkgTime(p, Number(pickVal('#cfDay')));
+    }, 0));
     bindPicks(document.getElementById('sheetBody'));
     };
     renderTime();
@@ -2287,16 +2347,28 @@ function courseForm(id, preset) {
         termId: d.type === 'tutor' ? null : ((pickVal('#cfTerm') || todayTermId() || curTerm()) || null),
         note: val('cfNote')
       };
+      let pkgSlots = null;
       if (type === 'tutor') {
         base.startTime = val('cfStart'); base.endTime = val('cfEnd');
         base.packageId = val('cfPkg') || null; base.periodIdx = null;
+        // 关联课包时，各天的上课时间以课包排课为准（不同天可以不一样）
+        const pk = base.packageId ? gPackages().find(p => p.id === base.packageId) : null;
+        if (pk && (pk.schedule || []).length) pkgSlots = { slots: pk.schedule, dur: Number(pk.durationMin) || 90 };
       } else {
         base.periodIdx = Number(val('cfPeriod') || 0);
         base.startTime = null; base.endTime = null; base.packageId = null;
       }
+      /** 取该星期在课包里的真实起止时间；没排这天就沿用表单里填的时间 */
+      const timeFor = (wd) => {
+        if (!pkgSlots) return {};
+        const sl = pkgSlots.slots.find(x => Number(x.weekday) === wd);
+        if (!sl) return {};
+        const st = sl.start || '';
+        return { startTime: st, endTime: sl.end || endFromStart(st, pkgSlots.dur) };
+      };
       try {
         if (isEdit) {
-          await api('/courses/' + id, { method: 'PUT', body: { ...base, weekday: daysSel[0] } });
+          await api('/courses/' + id, { method: 'PUT', body: { ...base, ...timeFor(daysSel[0]), weekday: daysSel[0] } });
           // 同类型 + 同科目：把老师/地点/联系方式同步到其余课程，保持课表显示一致
           if (isOn('cfSync') && (base.teacher || base.location || base.teacherContact)) {
             const sync = { teacher: base.teacher, location: base.location, teacherContact: base.teacherContact };
@@ -2309,13 +2381,14 @@ function courseForm(id, preset) {
           }
         } else {
           // 拦截完全重复的课程（同年级/类型/科目/名称/星期/节次或起止时间），避免误加导致同一时间段显示多次
-          const dup = (wd) => gCourses().some(c => c.type === base.type && (c.subject || '') === (base.subject || '') && (c.name || '') === (base.name || '')
-            && Number(c.weekday) === wd && (c.periodIdx ?? null) === (base.periodIdx ?? null)
-            && (c.startTime || '') === (base.startTime || '') && (c.endTime || '') === (base.endTime || ''));
+          const isDup = (b) => gCourses().some(c => c.type === b.type && (c.subject || '') === (b.subject || '') && (c.name || '') === (b.name || '')
+            && Number(c.weekday) === b.weekday && (c.periodIdx ?? null) === (b.periodIdx ?? null)
+            && (c.startTime || '') === (b.startTime || '') && (c.endTime || '') === (b.endTime || ''));
           let skip = 0;
           for (const wd of daysSel) {
-            if (dup(wd)) { skip++; continue; }
-            await api('/courses', { method: 'POST', body: { ...base, weekday: wd } });
+            const body = { ...base, ...timeFor(wd), weekday: wd };   // 每天用课包里自己那天的上课时间
+            if (isDup(body)) { skip++; continue; }
+            await api('/courses', { method: 'POST', body });
           }
           if (skip) toast(`已跳过 ${skip} 节重复课程`);
         }
@@ -3075,7 +3148,7 @@ function pkgDetail(id) {
     const bm = b.plannedDate.slice(0, 7) === curYM ? 0 : 1;
     return am - bm || a.plannedDate.localeCompare(b.plannedDate);
   });
-  const schedTx = (p.schedule || []).map(s => WD_S[Number(s.weekday)] + ' ' + s.start + '-' + s.end).join('、');
+  const schedTx = (p.schedule || []).map(s => WD[Number(s.weekday)] + ' ' + s.start + '-' + s.end).join('、');
   const linked = gCourses().filter(c => c.packageId === p.id);
   const target = Math.ceil((Number(p.totalHours) || 0) / (Number(p.hoursEach) || 1));
   const needGen = sessions.length < target && (p.schedule || []).length;
@@ -3101,7 +3174,9 @@ function pkgDetail(id) {
       </div>
       ${schedTx ? `<p class="muted" style="margin-top:6px">📅 每周固定上课：${schedTx}（每次 ${p.hoursEach || 1} 课时）</p>` : ''}
       ${p.leaveRule ? `<p class="muted">🙋 请假规则：${LEAVE_RULE[p.leaveRule] || p.leaveRule}</p>` : ''}
-      ${linked.length ? `<p class="muted">🗓 已关联课表：${linked.map(c => WD_S[Number(c.weekday)] + courseTime(c).start).join('、')}</p>` : ''}
+      ${linked.length ? `<p class="muted">🗓 已关联课表：${linked.map(c => WD[Number(c.weekday)] + ' ' + courseTime(c).start + '-' + courseTime(c).end).join('、')}</p>` : ''}
+      ${pkgTimeDrift(p, linked).length ? `<p class="muted" style="color:var(--warn);margin-top:6px">⚠️ 课表里这 ${pkgTimeDrift(p, linked).length} 节课的上课时间与课包排课不一致
+        ${canEdit('package') ? `<button class="btn xs" style="margin-left:6px" onclick="fixLinkedCourseTime('${p.id}')">按课包排课修正</button>` : ''}</p>` : ''}
       ${p.note ? `<p class="tx2" style="margin-top:7px">${esc(p.note)}</p>` : ''}
       ${p.rolledHours ? `<p class="muted" style="color:var(--ok);margin-top:7px">⬆ 已结转 <b style="color:var(--ok)">${p.rolledHours}</b> 课时至新年级（旧包剩余课时已归零）</p>` : ''}
       ${p.fromRoll ? `<p class="muted" style="margin-top:7px">↘ 由旧课包结转而来，可用课时 <b>${p.fromRollHours || 0}</b> 节</p>` : ''}
@@ -3478,6 +3553,43 @@ function syncLinkedCourses(pkg, meta) {
     if (idx >= 0) courses.splice(idx, 1);
   }
 }
+/** 已关联的辅导课里，有没有「上课时间和课包排课对不上」的（多为旧版本导入时统一套用同一时间留下的历史数据） */
+function pkgTimeDrift(p, linked) {
+  const sch = p.schedule || [];
+  if (!sch.length) return [];
+  const dur = Number(p.durationMin) || 90;
+  const out = [];
+  (linked || []).forEach(c => {
+    const sl = sch.find(s => Number(s.weekday) === Number(c.weekday));
+    if (!sl) return;
+    const st = sl.start || '', en = sl.end || endFromStart(st, dur);
+    if ((c.startTime || '') === st && (c.endTime || '') === en) return;
+    out.push({ id: c.id, startTime: st, endTime: en, weekday: Number(c.weekday), from: (c.startTime || '') + '-' + (c.endTime || '') });
+  });
+  return out;
+}
+/** 一键把已关联的辅导课时间对齐到课包排课：各天按自己那天的时间，一次提交搞定 */
+async function fixLinkedCourseTime(pkgId) {
+  if (!needRole('package')) return;
+  const p = S.data.packages.find(x => x.id === pkgId);
+  if (!p) return;
+  const drift = pkgTimeDrift(p, gCourses().filter(c => c.packageId === pkgId && c.type === 'tutor'));
+  if (!drift.length) return toast('上课时间已经和课包一致啦');
+  const tx = drift.map(d => WD[Number(d.weekday)]).join('、');
+  confirmBox('修正上课时间',
+    `将把课表里 <b>${tx}</b> 这 ${drift.length} 节课的上课时间，按课包的每周排课重新对齐。<br>
+     各科时间以课包为准，不会影响课时消耗与课次记录。`,
+    async () => {
+      try {
+        window.__SAVING = true;
+        await api('/courses/batch', { method: 'POST', body: { ops: [], updates: drift.map(d => ({ id: d.id, startTime: d.startTime, endTime: d.endTime })) } });
+        await refresh();
+        toast(`已按课包排课修正 ${drift.length} 节课的时间 🕒`);
+      } catch (e) { toast(e.message); }
+      finally { window.__SAVING = false; }
+    }, '修正时间');
+}
+
 /** 仅更新「未来待上课次」的起止时间，不动日期与星期——用于「同星期、只改上课时间」的场景 */
 function updateFutureTimes(pkg, sched) {
   const map = {}; (sched || []).forEach(s => map[Number(s.weekday)] = s);
