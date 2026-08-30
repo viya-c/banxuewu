@@ -432,6 +432,8 @@ img{max-width:100%;display:block}
 @media (max-width:360px){
   .tt-cell{font-size:9.5px;min-height:40px}
   .tb-stat b{font-size:15px}
+  /* 窄屏（≤360，如 iPhone SE 一代）再降半号，保证最长的「态度」说明也完整显示在一行 */
+  .rate-tip{font-size:10px}
 }
 
 </style>
@@ -623,8 +625,8 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.33';
-const BUILD_NO = '20260830e';
+const APP_VERSION = '1.0.34';
+const BUILD_NO = '20260830f';
 const BUILD_TIME = '2026-08-30';
 const HOUSEHOLD_ID = 'default';
 
@@ -1009,6 +1011,7 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.34', date: '2026-08-30', items: ['每日评价「态度/方法/努力」恢复信息更完整的原版说明（主动进入学习状态… / 用对方法… / 投入程度…）', '一行排版不再靠砍字，改用「去缩进用满整行 + 不换行 + 超出省略」保证；≤360px 窄屏再自动降半号，完整显示不截断'] },
       { version: '1.0.33', date: '2026-08-30', items: ['修复：没「从课包导入」过的课外辅导课包，其排课仍会自动出现在课表的「🎯 课外辅导」格子里（渲染层漏了「是否已导入」的判断）', '现在只有导入过的课包才会在课表显示；未导入的只在课包里管理课时，不会污染课表', '已导入课包的「补课 / 调课到别的星期」仍照常显示在真实日期上，不受影响'] },
       { version: '1.0.32', date: '2026-08-30', items: ['成绩区加「📈 考试成绩」标题，与下方「📊 作业记录」形成上下两块', '成绩明细改为每 5 条一页、左右滑动查看，底部带页码点与「第 x/y 页」（记录再多也不把页面拉长）', '成绩明细字号整体调小 2~3 号：科目 14.5→12、日期名次 12→10.5、分数球 17→14 且 48px→42px', '作业区去掉「⭐ 打卡星星 N 颗」卡片', '每日评价「态度/方法/努力」的说明改为固定占一行（去掉缩进用满整行 + 超出省略，绝不再折两行）'] },
       { version: '1.0.31', date: '2026-08-30', items: ['批量录入新增「🗑 清空」：一键删除当前年级全部正课/延时课（课外辅导不受影响，二次确认）', '批量保存改为一次性提交：原来每格一次请求（45~63 次全量上传）→ 现在 1 次，保存提速明显', '修复「保存有时报错」：GitHub 高频写入限流返回的 403 曾被误判成令牌失效并强制重新授权，现在区分限流与令牌失效，限流只提示稍后重试'] },
@@ -2938,9 +2941,9 @@ function renderDailyRating() {
   return `<div class="daily-sec">
     <div class="daily-head">📅 每日评价 <small>${fmtDate(d)} · 态度 / 方法 / 努力，每天一次</small></div>
     <div class="rate-edit">
-      ${row('att', '态度', '不用催、坐得住、先自己想，不拖延')}
-      ${row('meth', '方法', '先复习再做题，错题会归因，不盲目刷题')}
-      ${row('eff', '努力', '专注时长够，遇到难题愿意多坚持一会儿')}
+      ${row('att', '态度', '主动进入学习状态：不用催、不拖延，坐得住、先自己思考')}
+      ${row('meth', '方法', '用对方法：先复习再做题，错题会归因，不盲目刷题')}
+      ${row('eff', '努力', '投入程度：专注时长够，遇到难题愿意多坚持一会儿')}
     </div>
     <button class="btn sm ok" id="drSave" onclick="saveDailyRatingClick()">${dr ? '更新今日评价' : '保存今日评价'}</button>
   </div>`;
