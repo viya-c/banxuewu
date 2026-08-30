@@ -604,8 +604,8 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.29';
-const BUILD_NO = '20260830a';
+const APP_VERSION = '1.0.30';
+const BUILD_NO = '20260830b';
 const BUILD_TIME = '2026-08-30';
 const HOUSEHOLD_ID = 'default';
 
@@ -990,6 +990,7 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.30', date: '2026-08-30', items: ["修复：课表里已有正课/延时课时报错「Can't find variable: d」（格子传日期误写变量名，导致课表渲染失败）"] },
       { version: '1.0.29', date: '2026-08-30', items: ['成绩页新增「作业记录」：蜡烛图看每天的作业量 / 完成量，折线看当天积分，可切 7 天 / 14 天 / 30 天 / 本学期', '积分体系：完成 1 个作业 +1 分，每日评价「态度/方法/努力」每项 ≥4 星 各 +2 分', '积分总账显示总积分 / 生效积分 / 失效积分；家长可登记「使用积分」，用掉的部分转为失效'] },
       { version: '1.0.28', date: '2026-08-29', items: ['学员权限扩展到 4 项：记作业（可编辑）、作业打卡、记录辅导课上课（可撤销误记）、录成绩', '新增 attend 权限位：学员记上课后只能撤销「已上课」，不能碰请假/调课/取消/删除课次', '删除作业、删除成绩、删除课次、调课、请假、增删课包、改课表、家庭设置仍严格归管理员'] },
       { version: '1.0.27', date: '2026-08-29', items: ['作业区改版：顶部 14 天日期条（本周一→下周日，带每日数量徽标，自动定位到今天，点击直达当天）', '作业按「逾期 / 今天 / 明天 / 具体某天 / 更远 / 未设截止日 / 某天已完成」分组折叠，逾期+今天+明天默认展开', '已完成按打卡日倒序看最近 3 天，可一键「查看更早」'] },
@@ -2011,7 +2012,7 @@ function cellHTML(list, day, type, idx, off) {
   if (!c) return canEdit('course') ? `<div class="tt-cell empty-cell ${isToday ? 'is-today' : ''}" onclick="courseForm(null,{type:'${type}',weekday:${day},periodIdx:${idx}})">＋</div>` : `<div class="tt-cell empty-cell ${isToday ? 'is-today' : ''}"></div>`;
   const cls = type === 'main' ? 't-main' : 't-extend';
   const sub = c.teacher || c.location || '';
-  return `<div class="tt-cell ${cls} ${hasHW(c) ? 'hw-dot' : ''} ${isToday ? 'is-today' : ''}" onclick="courseDetail('${c.id}','${dayDate(d, off)}')">
+  return `<div class="tt-cell ${cls} ${hasHW(c) ? 'hw-dot' : ''} ${isToday ? 'is-today' : ''}" onclick="courseDetail('${c.id}','${dayDate(day, off)}')">
     ${esc(courseTitle(c))}${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
 }
 
