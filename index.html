@@ -625,8 +625,8 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.35';
-const BUILD_NO = '20260830g';
+const APP_VERSION = '1.0.36';
+const BUILD_NO = '20260831a';
 const BUILD_TIME = '2026-08-30';
 const HOUSEHOLD_ID = 'default';
 
@@ -1011,6 +1011,7 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.36', date: '2026-08-31', items: ['修复 fSelect 下拉静默丢数据：科目表被改过（删掉某科目）后，再去编辑用了该科目的旧课程/作业/成绩，表单打开时科目下拉会默认显示第一项、保存时科目被静默改成第一项；现在当前值不在选项里时会自动补一个 option 保住原值'] },
       { version: '1.0.35', date: '2026-08-30', items: ['修复：课包每周各天上课时间不同时，「从课包导入」把所有天都套用成同一时间（现在按课包排课逐天设置，如周三 18:30-20:30、周六 10:00-12:00）', '导入表单新增提示：课包各天时间不同时会列出「周三 xx、周六 xx」，并说明保存时按排课分别设置', '编辑已关联的辅导课，换星期后时间输入框自动跟着课包排课变', '课包详情新增「⚠️ 上课时间与课包排课不一致」提示 + 「按课包排课修正」按钮，一键对齐历史遗留的错误时间（一次请求批量完成）'] },
       { version: '1.0.34', date: '2026-08-30', items: ['每日评价「态度/方法/努力」恢复信息更完整的原版说明（主动进入学习状态… / 用对方法… / 投入程度…）', '一行排版不再靠砍字，改用「去缩进用满整行 + 不换行 + 超出省略」保证；≤360px 窄屏再自动降半号，完整显示不截断'] },
       { version: '1.0.33', date: '2026-08-30', items: ['修复：没「从课包导入」过的课外辅导课包，其排课仍会自动出现在课表的「🎯 课外辅导」格子里（渲染层漏了「是否已导入」的判断）', '现在只有导入过的课包才会在课表显示；未导入的只在课包里管理课时，不会污染课表', '已导入课包的「补课 / 调课到别的星期」仍照常显示在真实日期上，不受影响'] },
@@ -1838,11 +1839,15 @@ const isOn = id => { const e = document.getElementById(id); return e ? e.classLi
 
 /* ---------- 表单片段 ---------- */
 function fSelect(id, label, options, cur, required) {
+  const norm = o => (typeof o === 'string' ? { v: o, t: o } : o);
+  let list = options.map(norm);
+  // 当前值不在选项里（科目表被改过、或用了「课间操」这类课表专属项）→ 补一个，
+  // 否则浏览器会选中第一项，保存时静默把数据改成第一项
+  if (cur !== null && cur !== undefined && cur !== '' && !list.some(o => String(o.v) === String(cur))) {
+    list = list.concat([{ v: cur, t: cur }]);
+  }
   return `<div class="f"><label>${label}${required ? ' <em>*</em>' : ''}</label>
-    <select id="${id}">${options.map(o => {
-      const v = typeof o === 'string' ? o : o.v, t = typeof o === 'string' ? o : o.t;
-      return `<option value="${esc(v)}"${String(cur) === String(v) ? ' selected' : ''}>${esc(t)}</option>`;
-    }).join('')}</select></div>`;
+    <select id="${id}">${list.map(o => `<option value="${esc(o.v)}"${String(cur) === String(o.v) ? ' selected' : ''}>${esc(o.t)}</option>`).join('')}</select></div>`;
 }
 function fInput(id, label, value, ph, type = 'text', required) {
   return `<div class="f"><label>${label}${required ? ' <em>*</em>' : ''}</label>
