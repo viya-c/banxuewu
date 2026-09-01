@@ -20,10 +20,11 @@
   --fu:#A55EEA;        /* 课外辅导 */
   --fu-d:#8B44D6;
   --today:#475569;     /* 「今天」标识：中性石板灰，避开正课蓝/延时橙/辅导紫，不与课程色混淆 */
+  --today-bg:#EDF0F5;  /* 「今天」淡底，用于列表视图标题 pill */
   --am:#1F8A63;        /* 上午（青绿） */
   --am-bg:#EAF6F1;
-  --pm:#C97C1E;        /* 下午（琥珀） */
-  --pm-bg:#FFF4E5;
+  --pm:#B45309;       /* 下午（赭金，比延时橙更深，避免相邻两区糊成一片） */
+  --pm-bg:#FFF4E0;
   --ext:#D2762A;       /* 延时服务（橙） */
   --ext-bg:#FFF1E6;
   --tut:#8244C9;       /* 课外辅导（紫） */
@@ -78,6 +79,11 @@ img{max-width:100%;display:block}
 .tb-name{font-size:16px;font-weight:800;letter-spacing:.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tb-sub{font-size:11px;opacity:.88;margin-top:1px}
 .tb-actions{display:flex;gap:7px;align-items:center;flex:0 0 auto}
+/* 保存中指示器：写 GitHub 需要 1~3 秒，没提示会让人以为点完卡住了 */
+.saving-pill{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:12px;background:rgba(255,255,255,.24);color:#fff;font-size:11px;font-weight:700;flex:none;white-space:nowrap}
+.saving-pill[hidden]{display:none}
+.saving-pill i{width:6px;height:6px;border-radius:50%;background:#fff;animation:svPulse 1s ease-in-out infinite}
+@keyframes svPulse{0%,100%{opacity:.25;transform:scale(.75)}50%{opacity:1;transform:scale(1)}}
 .gradepick{background:rgba(255,255,255,.24);border-radius:20px;padding:5px 11px;font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:4px;white-space:nowrap}
 .icon-btn{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.22);display:grid;place-items:center;font-size:15px}
 
@@ -94,10 +100,18 @@ img{max-width:100%;display:block}
 
 .sec-h{display:flex;align-items:center;justify-content:space-between;margin:16px 2px 9px;gap:8px}
 .sec-h:first-child{margin-top:2px}
+/* 分区折叠：每个区块标题可点，默认收起，点标题展开看内容 */
+[hidden]{display:none!important}
+.sec-h.foldable{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.sec-h.foldable .sec-t{pointer-events:none}  /* 点标题任意处都触发折叠，不拦截 */
+.sec-h .fold-ar{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;color:var(--mu);flex:none;transition:transform .18s}
+.sec-h.collapsed .fold-ar{transform:rotate(-90deg)}
+.sec-h .fold-ar svg{display:block}
+.clog-more{margin-top:9px;font-size:12.5px;font-weight:700;color:var(--main);text-align:center;cursor:pointer;padding:7px 0;border-top:1px dashed var(--bd)}
 .sec-t{font-size:15.5px;font-weight:800;display:flex;align-items:center;gap:6px}
 .sec-t small{font-size:11.5px;color:var(--mu);font-weight:600}
-.sec-t.today{color:var(--main)}
-.sec-t.today .ic-today{width:8px;height:8px;color:var(--main);flex:none}
+.sec-t.today{color:var(--today);background:var(--today-bg);padding:3px 10px;border-radius:9px;margin-left:-4px}
+.sec-t.today .ic-today{width:8px;height:8px;color:var(--today);flex:none}
 
 /* 全部课次：按月折叠手风琴 */
 .mo-hd{display:flex;align-items:center;gap:8px;padding:11px 13px;background:var(--card);border:1px solid var(--bd);border-radius:13px;cursor:pointer;box-shadow:var(--sh)}
@@ -276,9 +290,9 @@ img{max-width:100%;display:block}
 .hw-day .n{display:inline-block;min-width:15px;height:15px;line-height:15px;border-radius:8px;font-size:9.5px;font-weight:800;color:#fff;background:var(--main);margin-top:3px;padding:0 3px}
 .hw-day .n.warn{background:var(--warn)}
 .hw-day .n.hide{visibility:hidden}
-.hw-day.today{background:var(--main);border-color:var(--main);box-shadow:0 3px 10px rgba(91,140,255,.3)}
+.hw-day.today{background:var(--today);border-color:var(--today);box-shadow:0 3px 10px rgba(60,72,92,.26)}
 .hw-day.today .w,.hw-day.today .d{color:#fff}
-.hw-day.today .n{background:#fff;color:var(--main)}
+.hw-day.today .n{background:#fff;color:var(--today)}
 .hw-day.today .n.warn{color:var(--warn)}
 .hw-day.on{border-color:var(--main);box-shadow:0 0 0 2px rgba(91,140,255,.18)}
 .hw-g{margin-bottom:9px}
@@ -514,6 +528,7 @@ img{max-width:100%;display:block}
         </div>
       </div>
       <div class="tb-actions">
+        <span class="saving-pill" id="savingPill" hidden><i></i>保存中</span>
         <button class="gradepick" id="gradeBtn"><span id="gradeName">三年级</span> ▾</button>
         <button class="icon-btn" id="bellBtn" title="提醒">🔔</button>
       </div>
@@ -646,8 +661,8 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.43';
-const BUILD_NO = '20260901e';
+const APP_VERSION = '1.0.45';
+const BUILD_NO = '20260901g';
 const BUILD_TIME = '2026-08-30';
 const HOUSEHOLD_ID = 'default';
 
@@ -1047,6 +1062,9 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.45', date: '2026-09-01', items: ['★全模块分区折叠：每个功能区块（课表工具 / 作息设置 / 提醒设置 / 数据备份 / 更新日志…）标题现在可点，默认收起，点标题展开看内容——页面不再一拉到底，首屏更清爽；课程主视图、作业列表这类核心内容保持常驻', '更新日志只显示最近 3 条，点「查看全部 N 条」展开完整历史', '折叠头用内联 SVG 箭头（收起时朝下、展开时朝右），不是 emoji'] },
+      { version: '1.0.44', date: '2026-09-01', items: ['★性能优化：1.0.41 加的「写入前先拉远端」防覆盖机制，让每一次保存都多一次网络往返，切学期 / 翻页 / 保存时能明显感到变慢。现在给这次预拉加了 9 秒节流：连续操作只预拉一次，单次操作仍照常预拉，防覆盖效果不打折、速度回到从前；写入失败的重试等待也从 2 秒 / 5 秒缩短到 1 秒 / 2 秒',
+'新增「保存中」徽标：写 GitHub 要 1~3 秒，此前点完保存毫无反馈，主观上就是「卡住了」。现在顶栏会显示一个脉冲小徽标，写完自动消失（同时也肉眼可见这次保存到底花了多久）', '课表分区配色：上午（青绿）、下午（琥珀）、延时服务（橙）、课外辅导（紫）四段各有底色与文字色，左侧节次号同步着色，一眼分清哪几节属于哪个时段', '正课不再固定「前 4 节上午」，改为按作息时间自动切分：开始时间早于 12:00 归上午、否则归下午（作息未填时间时才退回按节次号估算）', '去掉「今天」的蓝色：课表表头、今天格子、列表视图「今天」标题、作业区日期条，四处统一改用中性石板灰 #475569。原来的蓝和正课蓝撞色、看不出是「今天」，现在与课程色系彻底分开（靠灰色 + 圆点图标双重标识，仍然一眼看到）'] },
       { version: '1.0.43', date: '2026-09-01', items: ['修复顶栏统计「张冠李戴」：第一格数字其实是今天的课程数，标签却写着「作业」，造成「明明没作业却显示 7」的误会。标签已改为「今日课程」；作业数看第二格「待办作业」（含逾期未完成）'] },
       { version: '1.0.42', date: '2026-09-01', items: ['★修复作息保存不住的元凶：数据迁移函数在每次同步时重建学期，只保留「编号 / 名称 / 起止日期」四个字段，把各学期独立的作息整个丢掉（1.0.38 增加「作息按学期隔离」时这段老代码没跟着升级）。表现为 ①课表时间始终走全局默认作息，改了不生效 ②重新点进作息设置显示为默认值 ③保存后 15 秒又被下一次同步抹掉。现在迁移保留每个学期自己的作息', '顺带修复：在年级设置里添加的自定义学期（不在「上学期 / 寒假 / 暑假 / 下学期」四个默认阶段里的）每次同步会被静默丢弃，现在保留', '提醒：此前被抹掉的作息已随同步写进了 GitHub，无法自动找回，推本版后请在「作息设置」里重新设一次（这次能存住）'] },
       { version: '1.0.41', date: '2026-09-01', items: ['修复「作息改了又退回去」场景一（写入失败）：保存时写 GitHub 若遇限流/网络抖动，本地界面先变了、远端却没写上，15 秒后轮询把旧数据拉回来覆盖 → 退回。现在限流与网络错误自动退避重试（最多 3 次，隔 2 秒 / 5 秒），大幅降低保存失败率', '修复场景二（多设备覆盖）：本应用是整份数据文件一次性覆盖写入，家里其它设备（孩子平板 / 家人手机）若挂着旧页面，它做任何操作（哪怕点个打卡、切个学期）都会把内存里的旧数据整份写回 GitHub，盖掉你刚保存的作息 → 退回。现在每次写入前先拉远端最新数据做基底，旧页面再写入也不会覆盖别人刚存的改动'] },
@@ -1152,7 +1170,14 @@ function reconcile(DB) {
       headers: headers({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body)
     });
-    if (res.status === 409) { ghSha = null; await ghGet(); throw new Error('数据冲突，已自动刷新，请重试'); }
+    if (res.status === 409) {
+      // 冲突：本机持有陈旧基底。必须真正把远端最新数据拉回本机，否则用户重试时仍是陈旧数据，
+      // 会用旧内容整份覆盖别人刚存的改动（1.0.41 的旧写法只刷了 sha、没刷数据，等于静默覆盖）。
+      lastPull = Date.now();
+      await pullRemote();                       // 真正用远端最新数据覆盖本机
+      try { renderTop(); if (RENDER[S.page]) RENDER[S.page](); } catch (_) { }
+      throw new Error('这份数据刚才被其它设备改过，已自动同步成最新，请重新操作一次');
+    }
     if (res.status === 429) throw new Error('操作太频繁，GitHub 暂时限流了，请稍后再试');
     if (res.status === 401 || res.status === 403) {
       // 403 有两种截然不同的原因：令牌真的失效/无权限，或 GitHub 的「二级限流」（短时间写入过频）。
@@ -1406,6 +1431,22 @@ function reconcile(DB) {
   }
 
   window.__GH_API = { api: ghApi, syncOnce, startSync };
+})();
+
+/* 「保存中」指示器：拦截 window.__SAVING 的赋值，自动显示/隐藏顶栏徽标。
+   写入 GitHub 整份数据要 1~3 秒（还要先拉一次远端防覆盖），
+   没有任何反馈时主观上就是「点了半天没反应 → 觉得变慢了」。 */
+(function () {
+  let v = false;
+  Object.defineProperty(window, '__SAVING', {
+    configurable: true,
+    get() { return v; },
+    set(nv) {
+      v = !!nv;
+      const el = document.getElementById('savingPill');
+      if (el) el.hidden = !v;
+    }
+  });
 })();
 
 </script>
@@ -1898,6 +1939,7 @@ function openSheet(title, bodyHTML, footHTML, onMount) {
   $('#sheetTitle').textContent = title;
   $('#sheetBody').innerHTML = bodyHTML;
   $('#sheetFoot').innerHTML = footHTML || '';
+  wireFolds($('#sheetBody'));   // 弹层内的分区（学校正课 / 相关作业…）也默认折叠
   $('#mask').classList.add('on');
   document.body.style.overflow = 'hidden';
   $('#sheet').scrollTop = 0;
@@ -4600,22 +4642,15 @@ function renderMe() {
       <button class="btn xs ghost" onclick="clearGradeData()">清空</button></div></div>`;
   }
 
-  // 更新日志（默认全部折叠，点版本号展开）
+  // 更新日志：默认只显示最近 3 条，点「查看全部」展开历史完整记录
+  const clogAll = S.data.changelog || [];
   h += `<div class="sec-h"><div class="sec-t">📋 更新日志</div></div><div class="card">`;
-  h += (S.data.changelog || []).map(c => `<div class="clog" style="padding:7px 0;border-bottom:1px solid var(--bd)">
-    <div class="clog-h" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
-      <b style="font-size:13.5px">v${esc(c.version)} <span class="muted" style="font-weight:400">${esc(c.date)}</span></b>
-      <span class="clog-ar" style="transition:transform .15s;color:var(--mu)">▸</span></div>
-    <ul class="clog-items" style="margin:5px 0 0 16px;font-size:12.5px;color:var(--tx2);line-height:1.75;display:none">${c.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>`).join('');
+  h += clogAll.slice(0, 3).map(clogItemHTML).join('');
+  if (clogAll.length > 3) h += `<div class="clog-more" onclick="showAllClog(this)">查看全部 ${clogAll.length} 条 ▾</div>`;
   h += `</div>`;
 
   box.innerHTML = h;
-  box.querySelectorAll('.clog-h').forEach(hd => hd.onclick = () => {
-    const items = hd.parentElement.querySelector('.clog-items');
-    const open = items.style.display === 'none';
-    items.style.display = open ? 'block' : 'none';
-    hd.querySelector('.clog-ar').textContent = open ? '▾' : '▸';
-  });
+  box.querySelectorAll('.clog-h').forEach(hd => hd.onclick = () => bindClogClick(hd));
   bindPicks(box);
   if ('Notification' in window && Notification.permission === 'granted') {
     const b = document.getElementById('notifyBtn');
@@ -4954,6 +4989,68 @@ const RENDER = {
   me: renderMe
 };
 
+/* ---------- 分区折叠：每个区块标题可点，默认收起，点标题展开 ---------- */
+function setFold(secH, collapsed) {
+  if (!secH) return;
+  secH.classList.toggle('collapsed', collapsed);
+  let n = secH.nextElementSibling;
+  while (n && !(n.classList && n.classList.contains('sec-h'))) {
+    n.hidden = collapsed;   // [hidden]{display:none!important} 兜底
+    n = n.nextElementSibling;
+  }
+}
+function wireFold(secH) {
+  if (!secH || secH.dataset.fw) return;
+  secH.dataset.fw = '1';
+  secH.classList.add('foldable');
+  const ar = document.createElement('span');
+  ar.className = 'fold-ar';
+  ar.innerHTML = '<svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  secH.insertBefore(ar, secH.firstChild);
+  setFold(secH, true);   // 默认折叠：进来每个分区都是收起的，点标题展开
+}
+function wireFolds(root) {
+  if (!root) return;
+  Array.from(root.querySelectorAll('.sec-h')).forEach(wireFold);
+}
+(function initFold() {
+  const obs = ('MutationObserver' in window) ? new MutationObserver(muts => {
+    for (const m of muts) for (const n of m.addedNodes) {
+      if (n.nodeType !== 1) continue;
+      const list = (n.classList && n.classList.contains('sec-h')) ? [n] : Array.from(n.querySelectorAll('.sec-h'));
+      list.forEach(wireFold);
+    }
+  }) : null;
+  if (obs) obs.observe(document.body, { childList: true, subtree: true });
+  document.querySelectorAll('.sec-h').forEach(wireFold);
+})();
+document.addEventListener('click', e => {
+  const h = e.target.closest ? e.target.closest('.sec-h') : null;
+  if (!h || !h.classList.contains('foldable')) return;
+  if (e.target.closest('button, a, [onclick]')) return;   // 不拦截区块内的操作按钮（如「+ 加一节」）
+  setFold(h, !h.classList.contains('collapsed'));
+});
+
+function clogItemHTML(c) {
+  return `<div class="clog" style="padding:7px 0;border-bottom:1px solid var(--bd)">
+    <div class="clog-h" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+      <b style="font-size:13.5px">v${esc(c.version)} <span class="muted" style="font-weight:400">${esc(c.date)}</span></b>
+      <span class="clog-ar" style="transition:transform .15s;color:var(--mu)">▸</span></div>
+    <ul class="clog-items" style="margin:5px 0 0 16px;font-size:12.5px;color:var(--tx2);line-height:1.75;display:none">${c.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>`;
+}
+function bindClogClick(hd) {
+  const items = hd.parentElement.querySelector('.clog-items');
+  const open = items.style.display === 'none';
+  items.style.display = open ? 'block' : 'none';
+  hd.querySelector('.clog-ar').textContent = open ? '▾' : '▸';
+}
+function showAllClog(btn) {
+  const card = btn.closest('.card');
+  const all = S.data.changelog || [];
+  card.innerHTML = all.map(clogItemHTML).join('');
+  card.querySelectorAll('.clog-h').forEach(hd => hd.onclick = () => bindClogClick(hd));
+}
+
 function go(p) {
   S.page = p;
   if (p === 'timetable') S.ttWeekOffset = 0; // 进入课表回到当周
@@ -4963,6 +5060,7 @@ function go(p) {
   const fab = $('#fab');
   fab.style.display = p === 'me' ? 'none' : 'grid';
   RENDER[p] && RENDER[p]();
+  wireFolds(document.getElementById('page-' + p));   // 本页区块装配折叠（默认收起）
   applyRoleUI();
 }
 
