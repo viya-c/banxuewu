@@ -624,8 +624,8 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.40';
-const BUILD_NO = '20260901b';
+const APP_VERSION = '1.0.41';
+const BUILD_NO = '20260901c';
 const BUILD_TIME = '2026-08-30';
 const HOUSEHOLD_ID = 'default';
 
@@ -1014,6 +1014,7 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.41', date: '2026-09-01', items: ['修复「作息改了又退回去」场景一（写入失败）：保存时写 GitHub 若遇限流/网络抖动，本地界面先变了、远端却没写上，15 秒后轮询把旧数据拉回来覆盖 → 退回。现在限流与网络错误自动退避重试（最多 3 次，隔 2 秒 / 5 秒），大幅降低保存失败率', '修复场景二（多设备覆盖）：本应用是整份数据文件一次性覆盖写入，家里其它设备（孩子平板 / 家人手机）若挂着旧页面，它做任何操作（哪怕点个打卡、切个学期）都会把内存里的旧数据整份写回 GitHub，盖掉你刚保存的作息 → 退回。现在每次写入前先拉远端最新数据做基底，旧页面再写入也不会覆盖别人刚存的改动'] },
       { version: '1.0.40', date: '2026-09-01', items: ['修复「作息改了又退回去」：保存作息（保存按钮 / 加一节 / 删一节）时后台写 GitHub 需要几秒，这期间 15 秒轮询会把远端旧数据拉回来覆盖本地，界面退回改动前；现在写入期间暂停轮询，写完才恢复', '同款修复「刚切的学期又跳回去」：切学期是后台静默保存，写入期间同样会被轮询拉回旧学期，已一并修复', '加/删一节以前保存失败只在后台静默报错，现在会弹出提示（限流 / 数据冲突能看到原因）'] },
       { version: '1.0.39', date: '2026-09-01', items: ['单双周自动显示：课表按「当前查看周」的奇偶性自动显示单/双周课（第1周=单周、第2周=双周…），不再需要手动切「单双周视图」——翻到第几周就显示那一周该上的课；原来的「单/双周」切换按钮已删除', '周导航条现在标注当前周是「单周」还是「双周」（如「第 3 周 / 20 · 单周」），一眼看清这周显示的是哪类课', '列表视图也按当周单双周过滤（之前列表视图完全没过滤单双周，现与周视图一致）', '今天标识更醒目：表头、今天课程格子、列表「今天」标题都加了一个内联 SVG 圆点图标，不再只靠颜色区分——之前今天蓝底白字和课程蓝色基调太接近、不够明显'] },
       { version: '1.0.38', date: '2026-08-31', items: ['作息按学期隔离：正课/延时课的「第几节对应几点」改为每个学期独立一份节次表（原来年级全局共用一份 settings.periods，改一处全学期跟着变），现在上学期/寒假/暑假/下学期的上下课时间可分别设置、互不影响', '课表渲染、课程表单节次下拉、批量录入表格、作息设置页全部按「当前学期」取对应节次表', '课程按 termId 自动用该学期作息；长线课（不指定学期）跟随当前查看的学期', '老数据自动迁移：学期无节次表的注入默认 7 节正课 + 2 节延时；设置页改作息只写回当前学期，不污染其它学期'] },
@@ -1088,7 +1089,26 @@ function reconcile(DB) {
     ghSha = j.sha;
     return JSON.parse(b64dec(j.content));
   }
+  /* 写前同步用：拉远端最新并覆盖本机 S.data（不做界面刷新） */
+  async function pullRemote() {
+    if (!S.token || !S.data) return;
+    const st = await ghGet();
+    if (st) S.data = reconcile(st);
+  }
+  /* 写入自动重试：限流(429 / 403 二级限流)与网络抖动属环境问题，退避后自动重试（最多 3 次）；
+     409 冲突与令牌失效不自动重试（前者需换基底、后者需换令牌），避免用陈旧数据盲目覆盖。 */
   async function ghPut(state) {
+    for (let attempt = 1; ; attempt++) {
+      try { return await ghPutOnce(state); }
+      catch (e) {
+        const msg = (e && e.message) || '';
+        const retriable = attempt < 3 && /太频繁|写入仓库失败|Failed to fetch|NetworkError|Load failed|timeout/i.test(msg);
+        if (!retriable) throw e;
+        await new Promise(r => setTimeout(r, attempt === 1 ? 2000 : 5000)); // 退避 2s / 5s
+      }
+    }
+  }
+  async function ghPutOnce(state) {
     const body = { message: '星光伴学屋 · 更新数据', content: b64enc(JSON.stringify(state)), branch: G.branch };
     if (ghSha) body.sha = ghSha;     // 已存在则带 sha；首次创建不带
     const res = await fetch(fileUrl(), {
@@ -1119,14 +1139,22 @@ function reconcile(DB) {
 
   /* 端口：语义与 worker.js handleAPI 一致，但操作本地 state 并持久化到 GitHub */
   async function ghApi(path, opt = {}) {
+    let freshlyLoaded = false;
     if (!S.data) {
       let st = await ghGet();
       if (!st || typeof st !== 'object') st = defaultData();
       S.data = reconcile(st);
+      freshlyLoaded = true;
+    }
+    const method = (opt.method || 'GET').toUpperCase();
+    // 写前同步：任何写操作前先拉远端最新数据做基底。本应用是「整份数据文件一次性覆盖写入」，
+    // 若本机持有陈旧数据（如挂着没动的旧页面）就直接写入，会把内存里的旧数据整份覆盖到 GitHub，
+    // 抹掉其它设备刚保存的改动（作息「改了又退回去」的多设备根源）。
+    if (method !== 'GET' && !freshlyLoaded && path !== '/login' && path !== '/meta') {
+      try { await pullRemote(); } catch (_) { }
     }
     const state = S.data;
     const seg = path.replace(/^\//, '').split('/').filter(Boolean);
-    const method = (opt.method || 'GET').toUpperCase();
     const body = opt.body || {};
     const commit = async () => { await ghPut(S.data); };
     const ok = (data) => ({ ok: true, data });
