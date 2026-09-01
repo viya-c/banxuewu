@@ -87,6 +87,8 @@ img{max-width:100%;display:block}
 .sec-h:first-child{margin-top:2px}
 .sec-t{font-size:15.5px;font-weight:800;display:flex;align-items:center;gap:6px}
 .sec-t small{font-size:11.5px;color:var(--mu);font-weight:600}
+.sec-t.today{color:var(--main)}
+.sec-t.today .ic-today{width:8px;height:8px;color:var(--main);flex:none}
 
 /* 全部课次：按月折叠手风琴 */
 .mo-hd{display:flex;align-items:center;gap:8px;padding:11px 13px;background:var(--card);border:1px solid var(--bd);border-radius:13px;cursor:pointer;box-shadow:var(--sh)}
@@ -165,8 +167,10 @@ img{max-width:100%;display:block}
 .tt-weekbar.off{opacity:.92}
 .tt-weekbar.off .wb-lab{color:var(--tx2)}
 .tt-weekbar.cur{background:linear-gradient(120deg,#EAF1FF,#F3EEFF)}
-.tt-hd.today{color:#fff;background:var(--main);border-radius:9px;padding:3px 0 5px;box-shadow:0 3px 9px rgba(74,128,240,.32)}
-.tt-cell.is-today{outline:2.5px solid rgba(74,128,240,.55);outline-offset:-2.5px}
+.tt-hd.today{color:#fff;background:var(--main);border-radius:9px;padding:3px 0 5px;box-shadow:0 3px 9px rgba(74,128,240,.32);position:relative}
+.tt-hd.today .ic-today{width:8px;height:8px;color:#fff;vertical-align:middle;margin-right:2px}
+.tt-cell.is-today{outline:2.5px solid var(--main);outline-offset:-2.5px;box-shadow:0 4px 12px rgba(74,128,240,.3)}
+.tt-cell.is-today .ic-today{position:absolute;top:3px;left:4px;width:8px;height:8px;fill:#fff;stroke:var(--main);stroke-width:1.8}
 .tt.is-curweek{} /* 当周靠列高亮表现 */
 
 /* 每日评价（态度/方法/努力，每天一次） */
@@ -502,11 +506,6 @@ img{max-width:100%;display:block}
         <button class="on" data-v="week">周视图</button>
         <button data-v="list">列表</button>
       </div>
-      <div class="seg" id="ttWeekSeg">
-        <button class="on" data-v="all">每周</button>
-        <button data-v="odd">单周</button>
-        <button data-v="even">双周</button>
-      </div>
     </div>
     <div id="ttBody"></div>
     <div class="legend">
@@ -625,10 +624,25 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.36';
-const BUILD_NO = '20260831a';
+const APP_VERSION = '1.0.39';
+const BUILD_NO = '20260901a';
 const BUILD_TIME = '2026-08-30';
 const HOUSEHOLD_ID = 'default';
+
+/* 默认节次表：新年级 / 新年级默认学期的作息模板（各学期可单独覆盖 periods / extendPeriods） */
+const DEFAULT_PERIODS = [
+  { name: '第1节', start: '08:00', end: '08:40' },
+  { name: '第2节', start: '08:50', end: '09:30' },
+  { name: '第3节', start: '09:50', end: '10:30' },
+  { name: '第4节', start: '10:40', end: '11:20' },
+  { name: '第5节', start: '13:30', end: '14:10' },
+  { name: '第6节', start: '14:20', end: '15:00' },
+  { name: '第7节', start: '15:10', end: '15:50' }
+];
+const DEFAULT_EXTEND_PERIODS = [
+  { name: '延时1', start: '16:10', end: '17:00' },
+  { name: '延时2', start: '17:10', end: '18:00' }
+];
 
 /* ---------------------------- 工具 ---------------------------- */
 function uid(p = 'id') {
@@ -663,10 +677,10 @@ function schoolYearOf(dateStr) {
 function defaultTermSegments(sy) {
   const { y0, y1 } = schoolYearRange(sy);
   return [
-    { id: 't1', name: '上学期', start: `${y0}-09-01`, end: `${y1}-01-20` },
-    { id: 't2', name: '寒假', start: `${y1}-01-21`, end: `${y1}-02-15` },
-    { id: 't3', name: '下学期', start: `${y1}-02-16`, end: `${y1}-07-05` },
-    { id: 't4', name: '暑假', start: `${y1}-07-06`, end: `${y1}-08-31` }
+    { id: 't1', name: '上学期', start: `${y0}-09-01`, end: `${y1}-01-20`, periods: DEFAULT_PERIODS.map(p => ({ ...p })), extendPeriods: DEFAULT_EXTEND_PERIODS.map(p => ({ ...p })) },
+    { id: 't2', name: '寒假', start: `${y1}-01-21`, end: `${y1}-02-15`, periods: DEFAULT_PERIODS.map(p => ({ ...p })), extendPeriods: DEFAULT_EXTEND_PERIODS.map(p => ({ ...p })) },
+    { id: 't3', name: '下学期', start: `${y1}-02-16`, end: `${y1}-07-05`, periods: DEFAULT_PERIODS.map(p => ({ ...p })), extendPeriods: DEFAULT_EXTEND_PERIODS.map(p => ({ ...p })) },
+    { id: 't4', name: '暑假', start: `${y1}-07-06`, end: `${y1}-08-31`, periods: DEFAULT_PERIODS.map(p => ({ ...p })), extendPeriods: DEFAULT_EXTEND_PERIODS.map(p => ({ ...p })) }
   ];
 }
 
@@ -989,19 +1003,8 @@ function defaultData() {
         terms: defaultTermSegments(schoolYearOf()), currentTermId: 't1', createdAt: new Date().toISOString() }
     ],
     settings: {
-      periods: [
-        { name: '第1节', start: '08:00', end: '08:40' },
-        { name: '第2节', start: '08:50', end: '09:30' },
-        { name: '第3节', start: '09:50', end: '10:30' },
-        { name: '第4节', start: '10:40', end: '11:20' },
-        { name: '第5节', start: '13:30', end: '14:10' },
-        { name: '第6节', start: '14:20', end: '15:00' },
-        { name: '第7节', start: '15:10', end: '15:50' }
-      ],
-      extendPeriods: [
-        { name: '延时1', start: '16:10', end: '17:00' },
-        { name: '延时2', start: '17:10', end: '18:00' }
-      ],
+      periods: DEFAULT_PERIODS.map(p => ({ ...p })),
+      extendPeriods: DEFAULT_EXTEND_PERIODS.map(p => ({ ...p })),
       showWeekend: false,
       reminders: {
         classBefore: 30, homeworkBefore: 60, packageLowHours: 6, examBefore: 1,
@@ -1011,6 +1014,9 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.39', date: '2026-09-01', items: ['单双周自动显示：课表按「当前查看周」的奇偶性自动显示单/双周课（第1周=单周、第2周=双周…），不再需要手动切「单双周视图」——翻到第几周就显示那一周该上的课；原来的「单/双周」切换按钮已删除', '周导航条现在标注当前周是「单周」还是「双周」（如「第 3 周 / 20 · 单周」），一眼看清这周显示的是哪类课', '列表视图也按当周单双周过滤（之前列表视图完全没过滤单双周，现与周视图一致）', '今天标识更醒目：表头、今天课程格子、列表「今天」标题都加了一个内联 SVG 圆点图标，不再只靠颜色区分——之前今天蓝底白字和课程蓝色基调太接近、不够明显'] },
+      { version: '1.0.38', date: '2026-08-31', items: ['作息按学期隔离：正课/延时课的「第几节对应几点」改为每个学期独立一份节次表（原来年级全局共用一份 settings.periods，改一处全学期跟着变），现在上学期/寒假/暑假/下学期的上下课时间可分别设置、互不影响', '课表渲染、课程表单节次下拉、批量录入表格、作息设置页全部按「当前学期」取对应节次表', '课程按 termId 自动用该学期作息；长线课（不指定学期）跟随当前查看的学期', '老数据自动迁移：学期无节次表的注入默认 7 节正课 + 2 节延时；设置页改作息只写回当前学期，不污染其它学期'] },
+      { version: '1.0.37', date: '2026-08-31', items: ['切学期丝滑化：原来每切一次学期（上学期/寒假/暑假/下学期）都触发全量 refresh（重新从服务端拉全部数据 + 重建整页），在资料库限流下明显卡顿；现在改为本地即时重绘当前页与顶栏/角标，只后台静默写回学期选择，无全量重载', '顺带确认：课程按 termId 分学期显示、互不影响（寒假/暑假没排的课不显示）；但正课/延时课的「节次作息表」目前是年级全局共用一份 settings.periods，不随学期隔离'] },
       { version: '1.0.36', date: '2026-08-31', items: ['修复 fSelect 下拉静默丢数据：科目表被改过（删掉某科目）后，再去编辑用了该科目的旧课程/作业/成绩，表单打开时科目下拉会默认显示第一项、保存时科目被静默改成第一项；现在当前值不在选项里时会自动补一个 option 保住原值'] },
       { version: '1.0.35', date: '2026-08-30', items: ['修复：课包每周各天上课时间不同时，「从课包导入」把所有天都套用成同一时间（现在按课包排课逐天设置，如周三 18:30-20:30、周六 10:00-12:00）', '导入表单新增提示：课包各天时间不同时会列出「周三 xx、周六 xx」，并说明保存时按排课分别设置', '编辑已关联的辅导课，换星期后时间输入框自动跟着课包排课变', '课包详情新增「⚠️ 上课时间与课包排课不一致」提示 + 「按课包排课修正」按钮，一键对齐历史遗留的错误时间（一次请求批量完成）'] },
       { version: '1.0.34', date: '2026-08-30', items: ['每日评价「态度/方法/努力」恢复信息更完整的原版说明（主动进入学习状态… / 用对方法… / 投入程度…）', '一行排版不再靠砍字，改用「去缩进用满整行 + 不换行 + 超出省略」保证；≤360px 窄屏再自动降半号，完整显示不截断'] },
@@ -1344,7 +1350,6 @@ const S = {
   who: localStorage.getItem('sm_who') || '',
   role: '',            // 当前使用者角色：admin(管理员) / child(二类·记作业+打卡+记上课+录成绩) / viewer(三类·只读)
   ttView: 'week',
-  ttWeek: 'all',
   ttWeekOffset: 0,   // 课表「看第几周」偏移（0=当周），左右滑动改变
   examSubject: '',
   notified: new Set(JSON.parse(sessionStorage.getItem('sm_notified') || '[]'))
@@ -1497,6 +1502,11 @@ async function loadState() {
   const j = await api('/state');
   S.data = j.data;
   S.meta = j.meta;
+  // 老数据迁移：给每个学期补上独立的作息节次表（早期版本只有年级全局 settings.periods，无 per-term）
+  (S.data.grades || []).forEach(g => (g.terms || []).forEach(t => {
+    if (!Array.isArray(t.periods)) t.periods = DEFAULT_PERIODS.map(p => ({ ...p }));
+    if (!Array.isArray(t.extendPeriods)) t.extendPeriods = DEFAULT_EXTEND_PERIODS.map(p => ({ ...p }));
+  }));
   syncRole();        // 依据成员列表推导当前使用者角色
   syncTodayTerm();   // 打开应用：当前学期落到「今天」所在时段
   return S.data;
@@ -1568,6 +1578,16 @@ function weekParity() {
   const diff = Math.floor((new Date(today() + 'T00:00:00') - start) / 86400000);
   const wk = Math.floor(diff / 7) + 1;
   return { week: wk, parity: wk % 2 === 1 ? 'odd' : 'even' };
+}
+
+/** 课表「当前查看周」（基于周偏移 off）的单双周；null 表示无明确周次（如学期未开始），不过滤。
+ *  单双周由此自动按查看周判断，不再依赖手动「单双周视图」开关。 */
+function weekParityAtOffset(off) {
+  const vm = new Date(mondayOf(today()) + 'T00:00:00');
+  vm.setDate(vm.getDate() + (off || 0) * 7);
+  const info = termWeekOf(ymd(vm), curTerm());
+  if (!info.week || info.week < 1) return null;
+  return info.week % 2 === 1 ? 'odd' : 'even';
 }
 
 const curGrade = () => (S.data ? (S.data.grades.find(g => g.current) || S.data.grades[0]) : null);
@@ -1695,10 +1715,10 @@ function defaultTermSegments(sy) {
   const y0 = m ? +m[1] : new Date().getFullYear();
   const y1 = m ? +m[2] : y0 + 1;
   return [
-    { id: 't1', name: '上学期', start: `${y0}-09-01`, end: `${y1}-01-20` },
-    { id: 't2', name: '寒假', start: `${y1}-01-21`, end: `${y1}-02-15` },
-    { id: 't3', name: '下学期', start: `${y1}-02-16`, end: `${y1}-07-05` },
-    { id: 't4', name: '暑假', start: `${y1}-07-06`, end: `${y1}-08-31` }
+    { id: 't1', name: '上学期', start: `${y0}-09-01`, end: `${y1}-01-20`, periods: DEFAULT_PERIODS.map(p => ({ ...p })), extendPeriods: DEFAULT_EXTEND_PERIODS.map(p => ({ ...p })) },
+    { id: 't2', name: '寒假', start: `${y1}-01-21`, end: `${y1}-02-15`, periods: DEFAULT_PERIODS.map(p => ({ ...p })), extendPeriods: DEFAULT_EXTEND_PERIODS.map(p => ({ ...p })) },
+    { id: 't3', name: '下学期', start: `${y1}-02-16`, end: `${y1}-07-05`, periods: DEFAULT_PERIODS.map(p => ({ ...p })), extendPeriods: DEFAULT_EXTEND_PERIODS.map(p => ({ ...p })) },
+    { id: 't4', name: '暑假', start: `${y1}-07-06`, end: `${y1}-08-31`, periods: DEFAULT_PERIODS.map(p => ({ ...p })), extendPeriods: DEFAULT_EXTEND_PERIODS.map(p => ({ ...p })) }
   ];
 }
 
@@ -1714,15 +1734,21 @@ async function switchTerm(id) {
   if (!g) return;
   g.currentTermId = id;
   S.ttWeekOffset = 0; // 切学期回到当周
-  try { await api('/grades/' + g.id, { method: 'PUT', body: { currentTermId: id } }); await refresh(); }
-  catch (e) { toast(e.message); }
+  // 本地即时重绘：只重画当前页与顶栏/角标，不重新从服务端拉全量数据，避免切学期卡顿
+  renderTop();
+  if (RENDER[S.page]) RENDER[S.page]();
+  updateBadge();
+  // 后台静默持久化当前学期选择，失败不阻塞界面
+  api('/grades/' + g.id, { method: 'PUT', body: { currentTermId: id } }).catch(() => {});
 }
 
 /** 课程时间（返回 {start,end}） */
 function courseTime(c) {
   if (c.type === 'tutor' || c.customTime) return { start: c.startTime || '', end: c.endTime || '' };
-  const arr = c.type === 'extend' ? S.data.settings.extendPeriods : S.data.settings.periods;
-  const p = arr[c.periodIdx];
+  const term = curGradeTerms().find(t => t.id === (c.termId || curTerm())) || curGradeTerms()[0] || {};
+  const def = S.data.settings;
+  const arr = c.type === 'extend' ? (term.extendPeriods || def.extendPeriods) : (term.periods || def.periods);
+  const p = arr && arr[c.periodIdx];
   return p ? { start: p.start, end: p.end } : { start: c.startTime || '', end: c.endTime || '' };
 }
 function courseTitle(c) {
@@ -1743,6 +1769,9 @@ function courseActive(c, parity) {
   if (!c.weekType || c.weekType === 'all') return true;
   return c.weekType === parity;
 }
+
+/** 「今天」标记图标（内联 SVG 实心圆，颜色用 CSS 控制：表头白点 / 格子蓝边白芯） */
+const IC_TODAY = '<svg class="ic-today" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="4.2"/></svg>';
 
 /* ---------- 打卡星星 ---------- */
 
@@ -1941,9 +1970,10 @@ function weekBarHTML() {
   const vm = new Date(mondayOf(today()) + 'T00:00:00'); vm.setDate(vm.getDate() + off * 7);
   const info = termWeekOf(ymd(vm), curTerm());
   const termName = info.term ? info.term.name : '';
+  const parityTxt = info.week >= 1 ? (info.week % 2 === 1 ? '单周' : '双周') : '';
   let label;
   if (info.week < 1) label = (info.scope === 'term' ? termName + ' · ' : '') + '学期暂未开始';
-  else label = (info.scope === 'term' ? termName + ' · ' : '') + `第 ${info.week} 周` + (info.total ? ` / ${info.total}` : '');
+  else label = (info.scope === 'term' ? termName + ' · ' : '') + `第 ${info.week} 周` + (info.total ? ` / ${info.total}` : '') + (parityTxt ? ` · ${parityTxt}` : '');
   const cur = off === 0;
   const sub = info.week < 1 ? '尚未开始' : (cur ? '本周 · 点此刷新' : (off < 0 ? '过去 · 点此回本周' : '未来 · 点此回本周'));
   return `<div class="tt-weekbar ${cur ? 'cur' : 'off'}">
@@ -2042,7 +2072,8 @@ function ttWeekHTML(list) {
   const s = S.data.settings;
   const days = ttDays();
   const off = S.ttWeekOffset || 0;
-  const parity = S.ttWeek === 'all' ? null : S.ttWeek;
+  // 单双周：按当前查看周的奇偶性自动判断（第 1 周=单周、第 2 周=双周…），不再用手动开关
+  const parity = weekParityAtOffset(off);
   const vis = list.filter(c => !parity || !c.weekType || c.weekType === 'all' || c.weekType === parity);
 
   const colStyle = `grid-template-columns:26px repeat(${days.length},1fr)`;
@@ -2054,22 +2085,31 @@ function ttWeekHTML(list) {
     const iso = dayDate(d, off);
     dayISO[d] = iso;
     const md = iso ? iso.slice(5, 7) + '/' + iso.slice(8, 10) : '';
-    return `<div class="tt-hd ${iso === today() ? 'today' : ''}">${WD_S[d]}<span class="d">${md}</span></div>`;
+    return `<div class="tt-hd ${iso === today() ? 'today' : ''}">${iso === today() ? IC_TODAY : ''}${WD_S[d]}<span class="d">${md}</span></div>`;
   }).join('');
 
+  // 正课 / 延时课：行数取「当前学期节次表」与「视图内课程实际最大节次」的较大值，
+  // 避免长线课（跨学期、termId 为空，跟随当前学期）落在超出当前学期节次表范围时不显示
+  const curTermObj = curGradeTerms().find(t => t.id === curTerm()) || curGradeTerms()[0] || {};
+  const ttPeriods = curTermObj.periods || s.periods;
+  const ttExt = curTermObj.extendPeriods || s.extendPeriods;
+  const maxMain = Math.max(ttPeriods.length, ...vis.filter(c => c.type === 'main').map(c => (c.periodIdx || 0) + 1), 0);
+  const maxExt = Math.max(ttExt.length, ...vis.filter(c => c.type === 'extend').map(c => (c.periodIdx || 0) + 1), 0);
   // 正课
-  s.periods.forEach((p, i) => {
-    h += `<div class="tt-rn">${i + 1}<i>${p.start}</i></div>`;
+  for (let i = 0; i < maxMain; i++) {
+    const p = ttPeriods[i];
+    h += `<div class="tt-rn">${i + 1}<i>${p ? p.start : ''}</i></div>`;
     days.forEach(d => { h += cellHTML(vis, d, 'main', i, off); });
-  });
+  }
 
   // 延时课
-  if (s.extendPeriods.length) {
+  if (maxExt > 0) {
     h += `<div class="tt-sep">🌇 延时服务</div>`;
-    s.extendPeriods.forEach((p, i) => {
-      h += `<div class="tt-rn">延${i + 1}<i>${p.start}</i></div>`;
+    for (let i = 0; i < maxExt; i++) {
+      const p = ttExt[i];
+      h += `<div class="tt-rn">延${i + 1}<i>${p ? p.start : ''}</i></div>`;
       days.forEach(d => { h += cellHTML(vis, d, 'extend', i, off); });
-    });
+    }
   }
 
   // 课外辅导
@@ -2081,14 +2121,14 @@ function ttWeekHTML(list) {
     const cs = vis.filter(c => c.type === 'tutor' && Number(c.weekday) === d && courseInPkgRange(c, iso))
       .sort((a, b) => toMin(courseTime(a).start) - toMin(courseTime(b).start));
     if (!cs.length) {
-      h += canEdit('course') ? `<div class="tt-cell empty-cell ${isToday ? 'is-today' : ''}" onclick="courseForm(null,{type:'tutor',weekday:${d}})">＋</div>` : `<div class="tt-cell empty-cell ${isToday ? 'is-today' : ''}"></div>`;
+      h += canEdit('course') ? `<div class="tt-cell empty-cell ${isToday ? 'is-today' : ''}" onclick="courseForm(null,{type:'tutor',weekday:${d}})">${isToday ? '<span class="ic-today"></span>' : ''}＋</div>` : `<div class="tt-cell empty-cell ${isToday ? 'is-today' : ''}">${isToday ? '<span class="ic-today"></span>' : ''}</div>`;
     } else {
       h += `<div style="display:flex;flex-direction:column;gap:3px">` + cs.map(c => {
         const t = courseTime(c);
         const pk = c.packageId ? S.data.packages.find(p => p.id === c.packageId) : null;
         const sub = pk && pk.org ? ` <small style="color:var(--mu)">· ${esc(pk.org)}</small>` : '';
         const title = pk ? pk.name : courseTitle(c);   // 关联课包时优先显示课包名称（而非图标/科目）
-        return `<div class="tt-cell t-tutor ${hasHW(c) ? 'hw-dot' : ''} ${isToday ? 'is-today' : ''}" onclick="courseDetail('${c.id}','${dayISO[d]}')">
+        return `<div class="tt-cell t-tutor ${hasHW(c) ? 'hw-dot' : ''} ${isToday ? 'is-today' : ''}" onclick="courseDetail('${c.id}','${dayISO[d]}')">${isToday ? '<span class="ic-today"></span>' : ''}
           ${esc(title)}${sub}<small>${esc(t.start || '')}</small>${linkSessionPill(c.packageId, dayISO[d])}</div>`;
       }).join('') + offTemplateSessionChips(dayISO[d]) + `</div>`;
     }
@@ -2104,10 +2144,10 @@ function ttWeekHTML(list) {
 function cellHTML(list, day, type, idx, off) {
   const isToday = dayDate(day, off) === today();
   const c = list.find(x => x.type === type && Number(x.weekday) === day && Number(x.periodIdx) === idx);
-  if (!c) return canEdit('course') ? `<div class="tt-cell empty-cell ${isToday ? 'is-today' : ''}" onclick="courseForm(null,{type:'${type}',weekday:${day},periodIdx:${idx}})">＋</div>` : `<div class="tt-cell empty-cell ${isToday ? 'is-today' : ''}"></div>`;
+  if (!c) return canEdit('course') ? `<div class="tt-cell empty-cell ${isToday ? 'is-today' : ''}" onclick="courseForm(null,{type:'${type}',weekday:${day},periodIdx:${idx}})">${isToday ? '<span class="ic-today"></span>' : ''}＋</div>` : `<div class="tt-cell empty-cell ${isToday ? 'is-today' : ''}">${isToday ? '<span class="ic-today"></span>' : ''}</div>`;
   const cls = type === 'main' ? 't-main' : 't-extend';
   const sub = c.teacher || c.location || '';
-  return `<div class="tt-cell ${cls} ${hasHW(c) ? 'hw-dot' : ''} ${isToday ? 'is-today' : ''}" onclick="courseDetail('${c.id}','${dayDate(day, off)}')">
+  return `<div class="tt-cell ${cls} ${hasHW(c) ? 'hw-dot' : ''} ${isToday ? 'is-today' : ''}" onclick="courseDetail('${c.id}','${dayDate(day, off)}')">${isToday ? '<span class="ic-today"></span>' : ''}
     ${esc(courseTitle(c))}${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
 }
 
@@ -2119,7 +2159,8 @@ function ttListHTML(list) {
   const days = ttDays();
   let h = '';
   days.forEach(d => {
-    const cs = list.filter(c => Number(c.weekday) === d && (c.type !== 'tutor' || !c.packageId || courseInPkgRange(c, ymd(dayDate(d)))))
+    const cs = list.filter(c => Number(c.weekday) === d && (c.type !== 'tutor' || !c.packageId || courseInPkgRange(c, ymd(dayDate(d))))
+      && courseActive(c, weekParityAtOffset(0)))
       .sort((a, b) => {
         const o = { main: 0, extend: 1, tutor: 2 };
         if (o[a.type] !== o[b.type]) return o[a.type] - o[b.type];
@@ -2127,7 +2168,7 @@ function ttListHTML(list) {
         return (a.periodIdx || 0) - (b.periodIdx || 0);
       });
     const isToday = dayDate(d) === today();
-    h += `<div class="sec-h"><div class="sec-t ${isToday ? 'today' : ''}">${WD[d]}${isToday ? ' · 今天' : ''} <small>${cs.length} 节</small></div></div>`;
+    h += `<div class="sec-h"><div class="sec-t ${isToday ? 'today' : ''}">${isToday ? IC_TODAY : ''}${WD[d]}${isToday ? ' · 今天' : ''} <small>${cs.length} 节</small></div></div>`;
     if (!cs.length) { h += `<div class="card flat"><span class="muted">这天没有安排 🎈</span></div>`; return; }
     const dd = dayDate(d);
     h += `<div class="card">` + cs.map((c, i) => {
@@ -2307,7 +2348,8 @@ function courseForm(id, preset) {
           ${fInput('cfEnd', '结束时间', d.endTime || '20:00', '', 'time', true)}</div>
           <div id="cfSchedTip"></div>`;
       } else {
-        const arr = type === 'extend' ? s.extendPeriods : s.periods;
+        const cfTermObj = curGradeTerms().find(t => t.id === (d.termId || curTerm())) || curGradeTerms()[0] || { periods: [], extendPeriods: [] };
+        const arr = type === 'extend' ? (cfTermObj.extendPeriods || s.extendPeriods) : (cfTermObj.periods || s.periods);
         area.innerHTML = fSelect('cfPeriod', '节次', arr.map((p, i) => ({ v: i, t: `${p.name}  ${p.start}-${p.end}` })), d.periodIdx, true);
       }
     const pa = document.getElementById('cfPkgArea');
@@ -2417,11 +2459,14 @@ function batchForm() {
   };
   let g = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:separate;border-spacing:3px;min-width:330px">
     <tr><td></td>${days.map(d => `<td class="center" style="font-size:11.5px;font-weight:800;color:var(--tx2)">${WD_S[d]}</td>`).join('')}</tr>`;
-  s.periods.forEach((p, i) => {
+  const bt = curGradeTerms().find(t => t.id === curTerm()) || curGradeTerms()[0] || {};
+  const bPeriods = bt.periods || s.periods;
+  const bExt = bt.extendPeriods || s.extendPeriods;
+  bPeriods.forEach((p, i) => {
     g += `<tr><td style="font-size:10px;color:var(--mu);white-space:nowrap">${i + 1}</td>${days.map(d => `<td>${cellSel('main', 0, d, i)}</td>`).join('')}</tr>`;
   });
   g += `<tr><td colspan="${days.length + 1}" style="font-size:11px;font-weight:800;color:var(--yan-d);padding-top:6px">🌇 延时课</td></tr>`;
-  s.extendPeriods.forEach((p, i) => {
+  bExt.forEach((p, i) => {
     g += `<tr><td style="font-size:10px;color:var(--mu)">延${i + 1}</td>${days.map(d => `<td>${cellSel('extend', 0, d, i)}</td>`).join('')}</tr>`;
   });
   g += `</table></div>`;
@@ -2490,18 +2535,22 @@ async function batchClear() {
 /* ---------- 作息设置 ---------- */
 function periodForm() {
   if (!needRole('course')) return;
-  const s = S.data.settings;
+  const g = curGrade(); if (!g) return;
+  const term = curGradeTerms().find(t => t.id === curTerm()) || curGradeTerms()[0] || {};
+  const periods = term.periods || S.data.settings.periods;
+  const extendPeriods = term.extendPeriods || S.data.settings.extendPeriods;
   const rows = (arr, key) => arr.map((p, i) => `<div class="f2" style="margin-bottom:7px;align-items:center">
     <input value="${esc(p.name)}" data-k="${key}" data-i="${i}" data-f="name" style="flex:1.1">
     <input type="time" value="${p.start}" data-k="${key}" data-i="${i}" data-f="start">
     <input type="time" value="${p.end}" data-k="${key}" data-i="${i}" data-f="end">
     <button class="btn xs ghost" onclick="rmPeriod('${key}',${i})" style="flex:0 0 auto">✕</button></div>`).join('');
-  openSheet('作息时间设置',
-    `<div class="sec-h" style="margin-top:0"><div class="sec-t">🏫 学校正课</div><button class="btn xs" onclick="addPeriod('periods')">+ 加一节</button></div>
-     ${rows(s.periods, 'periods')}
+  openSheet('作息时间设置 · ' + (term.name || ''),
+    `<p class="muted" style="margin:2px 0 10px">当前编辑：<b>${esc(term.name || '')}</b> 的作息（各学期独立设置、互不影响；其它学期去顶栏切换后再设）</p>
+     <div class="sec-h" style="margin-top:0"><div class="sec-t">🏫 学校正课</div><button class="btn xs" onclick="addPeriod('periods')">+ 加一节</button></div>
+     ${rows(periods, 'periods')}
      <div class="sec-h"><div class="sec-t">🌇 延时课</div><button class="btn xs yan" onclick="addPeriod('extendPeriods')">+ 加一节</button></div>
-     ${rows(s.extendPeriods, 'extendPeriods')}
-     <div style="margin-top:12px">${fSwitch('psWeekend', '课表显示周六日', '周末有课外班时打开', s.showWeekend)}</div>`,
+     ${rows(extendPeriods, 'extendPeriods')}
+     <div style="margin-top:12px">${fSwitch('psWeekend', '课表显示周六日', '周末有课外班时打开', S.data.settings.showWeekend)}</div>`,
     `<button class="btn ghost" onclick="closeSheet()">取消</button><button class="btn" id="psSave">保存</button>`,
     () => {
       document.getElementById('psSave').onclick = async () => {
@@ -2514,24 +2563,33 @@ function periodForm() {
           }));
         };
         try {
-          await api('/settings', { method: 'PUT', body: { periods: collect('periods'), extendPeriods: collect('extendPeriods'), showWeekend: isOn('psWeekend') } });
-          await refresh(); closeSheet(); toast('作息已更新');
+          const np = collect('periods'), ne = collect('extendPeriods');
+          const terms = g.terms.map(t => t.id === curTerm() ? { ...t, periods: np, extendPeriods: ne } : t);
+          await api('/grades/' + g.id, { method: 'PUT', body: { terms } });
+          await api('/settings', { method: 'PUT', body: { showWeekend: isOn('psWeekend') } });
+          await refresh(); closeSheet(); toast((term.name || '当前学期') + ' 作息已更新');
         } catch (e) { toast(e.message); }
       };
     });
 }
 async function addPeriod(key) {
-  const arr = S.data.settings[key].slice();
+  const g = curGrade(); if (!g) return;
+  const term = curGradeTerms().find(t => t.id === curTerm()) || curGradeTerms()[0] || {};
+  const arr = (key === 'extendPeriods' ? (term.extendPeriods || []) : (term.periods || [])).slice();
   const last = arr[arr.length - 1];
   const st = last ? minToHM(toMin(last.end) + 10) : '08:00';
   arr.push({ name: (key === 'periods' ? '第' + (arr.length + 1) + '节' : '延时' + (arr.length + 1)), start: st, end: minToHM(toMin(st) + 40) });
-  await api('/settings', { method: 'PUT', body: { [key]: arr } });
+  const terms = g.terms.map(t => t.id === curTerm() ? { ...t, [key]: arr } : t);
+  await api('/grades/' + g.id, { method: 'PUT', body: { terms } });
   await refresh(); periodForm();
 }
 async function rmPeriod(key, i) {
-  const arr = S.data.settings[key].slice();
+  const g = curGrade(); if (!g) return;
+  const term = curGradeTerms().find(t => t.id === curTerm()) || curGradeTerms()[0] || {};
+  const arr = (key === 'extendPeriods' ? (term.extendPeriods || []) : (term.periods || [])).slice();
   arr.splice(i, 1);
-  await api('/settings', { method: 'PUT', body: { [key]: arr } });
+  const terms = g.terms.map(t => t.id === curTerm() ? { ...t, [key]: arr } : t);
+  await api('/grades/' + g.id, { method: 'PUT', body: { terms } });
   await refresh(); periodForm();
 }
 
@@ -4434,6 +4492,9 @@ function renderMe() {
     <div class="list-i"><div class="list-ic">💾</div><div class="col grow"><b style="font-size:14px">导出备份</b>
       <span class="muted">下载全部数据为 JSON 文件</span></div>
       <button class="btn xs ghost" onclick="exportData()">导出</button></div>
+    <div class="list-i"><div class="list-ic">📦</div><div class="col grow"><b style="font-size:14px">下载应用文件</b>
+      <span class="muted">保存当前 index.html 源文件（用于部署）</span></div>
+      <button class="btn xs ghost" onclick="downloadApp()">下载</button></div>
     <div class="list-i"><div class="list-ic">📥</div><div class="col grow"><b style="font-size:14px">恢复备份</b>
       <span class="muted">从备份文件恢复（会覆盖当前数据）</span></div>
       <button class="btn xs ghost" onclick="importData()">恢复</button></div>
@@ -4632,7 +4693,7 @@ function gradeForm(id) {
       renderGfTerms();
       const addBtn = document.getElementById('gfAddTerm');
       if (addBtn) addBtn.onclick = () => {
-        state.terms.push({ id: 'kt' + Math.random().toString(36).slice(2, 8), name: '' });
+        state.terms.push({ id: 'kt' + Math.random().toString(36).slice(2, 8), name: '', periods: DEFAULT_PERIODS.map(p => ({ ...p })), extendPeriods: DEFAULT_EXTEND_PERIODS.map(p => ({ ...p })) });
         renderGfTerms();
         const inp = document.querySelector('#gfTerms .gfTermName[data-i="' + (state.terms.length - 1) + '"]');
         if (inp) inp.focus();
@@ -4648,7 +4709,7 @@ function gradeForm(id) {
             state.terms[i].end = combineD3(row, 'end');
           }
         });
-        const terms = state.terms.map(t => ({ id: t.id, name: t.name, start: t.start || '', end: t.end || '' }));
+        const terms = state.terms.map(t => ({ id: t.id, name: t.name, start: t.start || '', end: t.end || '', periods: t.periods ? t.periods.map(p => ({ ...p })) : undefined, extendPeriods: t.extendPeriods ? t.extendPeriods.map(p => ({ ...p })) : undefined }));
         const body = {
           name: val('gfName'), schoolYear: val('gfYear'), startDate: val('gfStart'),
           terms, currentTermId: state.currentTermId || (terms[0] ? terms[0].id : '')
@@ -4753,6 +4814,18 @@ async function exportData() {
     a.click();
     toast('备份已下载');
   } catch (e) { toast(e.message); }
+}
+async function downloadApp() {
+  try {
+    const res = await fetch(location.href);
+    const html = await res.text();
+    const blob = new Blob([html], { type: 'text/html' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'index.html';
+    a.click();
+    toast('应用文件已下载，可推送到 GitHub');
+  } catch (e) { toast('下载失败：' + e.message); }
 }
 function importData() {
   if (!needRole('settings')) return;
@@ -5004,11 +5077,6 @@ function applyRoleUI() {
     const b = e.target.closest('button'); if (!b) return;
     $$('#ttSeg button').forEach(x => x.classList.toggle('on', x === b));
     S.ttView = b.dataset.v; renderTimetable();
-  });
-  $('#ttWeekSeg').addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
-    $$('#ttWeekSeg button').forEach(x => x.classList.toggle('on', x === b));
-    S.ttWeek = b.dataset.v; renderTimetable();
   });
 
   $('#fab').onclick = () => {
