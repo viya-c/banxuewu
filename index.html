@@ -19,6 +19,15 @@
   --yan-d:#F08721;
   --fu:#A55EEA;        /* 课外辅导 */
   --fu-d:#8B44D6;
+  --today:#475569;     /* 「今天」标识：中性石板灰，避开正课蓝/延时橙/辅导紫，不与课程色混淆 */
+  --am:#1F8A63;        /* 上午（青绿） */
+  --am-bg:#EAF6F1;
+  --pm:#C97C1E;        /* 下午（琥珀） */
+  --pm-bg:#FFF4E5;
+  --ext:#D2762A;       /* 延时服务（橙） */
+  --ext-bg:#FFF1E6;
+  --tut:#8244C9;       /* 课外辅导（紫） */
+  --tut-bg:#F4EDFD;
   --ok:#25C685;
   --warn:#FF6B6B;
   --star:#FFC531;
@@ -140,7 +149,7 @@ img{max-width:100%;display:block}
 .tt-wrap{background:var(--card);border-radius:var(--r);padding:9px 8px 11px;box-shadow:var(--sh);overflow-x:auto}
 .tt{display:grid;gap:4px;min-width:340px}
 .tt-hd{font-size:11.5px;font-weight:800;color:var(--tx2);text-align:center;padding:3px 0 5px}
-.tt-hd.today{color:var(--main)}
+.tt-hd.today{color:var(--today)}
 .tt-hd .d{font-size:9.5px;color:var(--mu);font-weight:600;display:block}
 .tt-rn{font-size:9.5px;color:var(--mu);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.25;font-weight:700}
 .tt-rn i{font-style:normal;font-size:8px;color:#C2C9DC;font-weight:500}
@@ -154,6 +163,19 @@ img{max-width:100%;display:block}
 .tt-cell.hw-dot::after{content:"";position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--star);box-shadow:0 0 0 1.5px rgba(255,255,255,.75)}
 .tt-sep{grid-column:1/-1;display:flex;align-items:center;gap:7px;margin:5px 0 2px;font-size:10.5px;font-weight:800;color:var(--tx2)}
 .tt-sep::after{content:"";flex:1;height:1px;background:var(--bd)}
+/* 课表分区配色：上午青绿 / 下午琥珀 / 延时橙 / 辅导紫（淡底 + 同色系文字，清晰不抢眼） */
+.tt-sep.am,.tt-sep.pm,.tt-sep.ext,.tt-sep.tut{padding:4px 9px;border-radius:9px;margin:7px 0 3px}
+.tt-sep.am::after,.tt-sep.pm::after,.tt-sep.ext::after,.tt-sep.tut::after{display:none}
+.tt-sep.am{background:var(--am-bg);color:var(--am)}
+.tt-sep.pm{background:var(--pm-bg);color:var(--pm)}
+.tt-sep.ext{background:var(--ext-bg);color:var(--ext)}
+.tt-sep.tut{background:var(--tut-bg);color:var(--tut)}
+.tt-rn.am,.tt-rn.pm,.tt-rn.ext,.tt-rn.tut{border-radius:7px;padding:2px 0}
+.tt-rn.am{background:var(--am-bg);color:var(--am)}
+.tt-rn.pm{background:var(--pm-bg);color:var(--pm)}
+.tt-rn.ext{background:var(--ext-bg);color:var(--ext)}
+.tt-rn.tut{background:var(--tut-bg);color:var(--tut)}
+.tt-rn.am i,.tt-rn.pm i,.tt-rn.ext i,.tt-rn.tut i{color:inherit;opacity:.62}
 .legend{display:flex;gap:12px;justify-content:center;margin-top:11px;font-size:11.5px;color:var(--tx2);flex-wrap:wrap}
 .legend i{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:-1px}
 
@@ -167,10 +189,10 @@ img{max-width:100%;display:block}
 .tt-weekbar.off{opacity:.92}
 .tt-weekbar.off .wb-lab{color:var(--tx2)}
 .tt-weekbar.cur{background:linear-gradient(120deg,#EAF1FF,#F3EEFF)}
-.tt-hd.today{color:#fff;background:var(--main);border-radius:9px;padding:3px 0 5px;box-shadow:0 3px 9px rgba(74,128,240,.32);position:relative}
+.tt-hd.today{color:#fff;background:var(--today);border-radius:9px;padding:3px 0 5px;box-shadow:0 3px 9px rgba(60,72,92,.26);position:relative}
 .tt-hd.today .ic-today{width:8px;height:8px;color:#fff;vertical-align:middle;margin-right:2px}
-.tt-cell.is-today{outline:2.5px solid var(--main);outline-offset:-2.5px;box-shadow:0 4px 12px rgba(74,128,240,.3)}
-.tt-cell.is-today .ic-today{position:absolute;top:3px;left:4px;width:8px;height:8px;fill:#fff;stroke:var(--main);stroke-width:1.8}
+.tt-cell.is-today{outline:2.5px solid var(--today);outline-offset:-2.5px;box-shadow:0 4px 12px rgba(60,72,92,.2)}
+.tt-cell.is-today .ic-today{position:absolute;top:3px;left:4px;width:8px;height:8px;fill:#fff;stroke:var(--today);stroke-width:1.8}
 .tt.is-curweek{} /* 当周靠列高亮表现 */
 
 /* 每日评价（态度/方法/努力，每天一次） */
@@ -624,8 +646,8 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.42';
-const BUILD_NO = '20260901d';
+const APP_VERSION = '1.0.43';
+const BUILD_NO = '20260901e';
 const BUILD_TIME = '2026-08-30';
 const HOUSEHOLD_ID = 'default';
 
@@ -1025,6 +1047,7 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.43', date: '2026-09-01', items: ['修复顶栏统计「张冠李戴」：第一格数字其实是今天的课程数，标签却写着「作业」，造成「明明没作业却显示 7」的误会。标签已改为「今日课程」；作业数看第二格「待办作业」（含逾期未完成）'] },
       { version: '1.0.42', date: '2026-09-01', items: ['★修复作息保存不住的元凶：数据迁移函数在每次同步时重建学期，只保留「编号 / 名称 / 起止日期」四个字段，把各学期独立的作息整个丢掉（1.0.38 增加「作息按学期隔离」时这段老代码没跟着升级）。表现为 ①课表时间始终走全局默认作息，改了不生效 ②重新点进作息设置显示为默认值 ③保存后 15 秒又被下一次同步抹掉。现在迁移保留每个学期自己的作息', '顺带修复：在年级设置里添加的自定义学期（不在「上学期 / 寒假 / 暑假 / 下学期」四个默认阶段里的）每次同步会被静默丢弃，现在保留', '提醒：此前被抹掉的作息已随同步写进了 GitHub，无法自动找回，推本版后请在「作息设置」里重新设一次（这次能存住）'] },
       { version: '1.0.41', date: '2026-09-01', items: ['修复「作息改了又退回去」场景一（写入失败）：保存时写 GitHub 若遇限流/网络抖动，本地界面先变了、远端却没写上，15 秒后轮询把旧数据拉回来覆盖 → 退回。现在限流与网络错误自动退避重试（最多 3 次，隔 2 秒 / 5 秒），大幅降低保存失败率', '修复场景二（多设备覆盖）：本应用是整份数据文件一次性覆盖写入，家里其它设备（孩子平板 / 家人手机）若挂着旧页面，它做任何操作（哪怕点个打卡、切个学期）都会把内存里的旧数据整份写回 GitHub，盖掉你刚保存的作息 → 退回。现在每次写入前先拉远端最新数据做基底，旧页面再写入也不会覆盖别人刚存的改动'] },
       { version: '1.0.40', date: '2026-09-01', items: ['修复「作息改了又退回去」：保存作息（保存按钮 / 加一节 / 删一节）时后台写 GitHub 需要几秒，这期间 15 秒轮询会把远端旧数据拉回来覆盖本地，界面退回改动前；现在写入期间暂停轮询，写完才恢复', '同款修复「刚切的学期又跳回去」：切学期是后台静默保存，写入期间同样会被轮询拉回旧学期，已一并修复', '加/删一节以前保存失败只在后台静默报错，现在会弹出提示（限流 / 数据冲突能看到原因）'] },
@@ -1079,6 +1102,7 @@ function reconcile(DB) {
   if (!window.__GITHUB) return;
   const G = window.__GITHUB;
   let ghSha = null;       // 当前 state.json 的 blob sha
+  let lastPull = 0;       // 上次成功拉取远端数据的时刻（用于写前同步节流，避免每次写入都多一次网络往返）
   let syncing = false;
 
   function headers(extra) {
@@ -1105,7 +1129,7 @@ function reconcile(DB) {
   async function pullRemote() {
     if (!S.token || !S.data) return;
     const st = await ghGet();
-    if (st) S.data = reconcile(st);
+    if (st) { S.data = reconcile(st); lastPull = Date.now(); }
   }
   /* 写入自动重试：限流(429 / 403 二级限流)与网络抖动属环境问题，退避后自动重试（最多 3 次）；
      409 冲突与令牌失效不自动重试（前者需换基底、后者需换令牌），避免用陈旧数据盲目覆盖。 */
@@ -1116,7 +1140,7 @@ function reconcile(DB) {
         const msg = (e && e.message) || '';
         const retriable = attempt < 3 && /太频繁|写入仓库失败|Failed to fetch|NetworkError|Load failed|timeout/i.test(msg);
         if (!retriable) throw e;
-        await new Promise(r => setTimeout(r, attempt === 1 ? 2000 : 5000)); // 退避 2s / 5s
+        await new Promise(r => setTimeout(r, attempt === 1 ? 1000 : 2000)); // 退避 1s / 2s（缩短等待，减少保存时的卡顿感）
       }
     }
   }
@@ -1157,12 +1181,15 @@ function reconcile(DB) {
       if (!st || typeof st !== 'object') st = defaultData();
       S.data = reconcile(st);
       freshlyLoaded = true;
+      lastPull = Date.now();
     }
     const method = (opt.method || 'GET').toUpperCase();
     // 写前同步：任何写操作前先拉远端最新数据做基底。本应用是「整份数据文件一次性覆盖写入」，
     // 若本机持有陈旧数据（如挂着没动的旧页面）就直接写入，会把内存里的旧数据整份覆盖到 GitHub，
     // 抹掉其它设备刚保存的改动（作息「改了又退回去」的多设备根源）。
-    if (method !== 'GET' && !freshlyLoaded && path !== '/login' && path !== '/meta') {
+    // 节流：轮询每 15 秒已保证本地数据新鲜，刚同步过（9 秒内）就不再重复拉取，
+    // 避免连续保存时每次写入都多扛一次网络往返（保存明显变慢的主因）。
+    if (method !== 'GET' && !freshlyLoaded && path !== '/login' && path !== '/meta' && Date.now() - lastPull > 9000) {
       try { await pullRemote(); } catch (_) { }
     }
     const state = S.data;
@@ -1362,6 +1389,7 @@ function reconcile(DB) {
     try {
       const st = await ghGet();
       if (st && ghSha) {
+        lastPull = Date.now();     // 轮询刚拉到最新，随后的写操作可跳过写前同步
         const fresh = reconcile(st);
         if (JSON.stringify(fresh) !== JSON.stringify(S.data)) {
           S.data = fresh;
@@ -2140,26 +2168,37 @@ function ttWeekHTML(list) {
   const ttExt = curTermObj.extendPeriods || s.extendPeriods;
   const maxMain = Math.max(ttPeriods.length, ...vis.filter(c => c.type === 'main').map(c => (c.periodIdx || 0) + 1), 0);
   const maxExt = Math.max(ttExt.length, ...vis.filter(c => c.type === 'extend').map(c => (c.periodIdx || 0) + 1), 0);
-  // 正课
+  // 正课：按作息时间自动分「上午 / 下午」两段（以 12:00 为界；时间缺失时按前 4 节算上午）
+  const zoneOf = (p, idx) => {
+    const st = p && p.start ? p.start : '';
+    if (st) return toMin(st) < 12 * 60 ? 'am' : 'pm';
+    return idx < 4 ? 'am' : 'pm';
+  };
+  let curZone = '';
   for (let i = 0; i < maxMain; i++) {
     const p = ttPeriods[i];
-    h += `<div class="tt-rn">${i + 1}<i>${p ? p.start : ''}</i></div>`;
+    const z = zoneOf(p, i);
+    if (z !== curZone) {
+      curZone = z;
+      h += `<div class="tt-sep ${z}">${z === 'am' ? '☀️ 上午' : '🌤 下午'}</div>`;
+    }
+    h += `<div class="tt-rn ${z}">${i + 1}<i>${p ? p.start : ''}</i></div>`;
     days.forEach(d => { h += cellHTML(vis, d, 'main', i, off); });
   }
 
   // 延时课
   if (maxExt > 0) {
-    h += `<div class="tt-sep">🌇 延时服务</div>`;
+    h += `<div class="tt-sep ext">🌇 延时服务</div>`;
     for (let i = 0; i < maxExt; i++) {
       const p = ttExt[i];
-      h += `<div class="tt-rn">延${i + 1}<i>${p ? p.start : ''}</i></div>`;
+      h += `<div class="tt-rn ext">延${i + 1}<i>${p ? p.start : ''}</i></div>`;
       days.forEach(d => { h += cellHTML(vis, d, 'extend', i, off); });
     }
   }
 
   // 课外辅导
-  h += `<div class="tt-sep">🎯 课外辅导</div>`;
-  h += `<div class="tt-rn">课外</div>`;
+  h += `<div class="tt-sep tut">🎯 课外辅导</div>`;
+  h += `<div class="tt-rn tut">课外</div>`;
   days.forEach(d => {
     const iso = dayISO[d];
     const isToday = iso === today();
@@ -4953,7 +4992,7 @@ function renderTop() {
   const nt = nc ? fmtDur(toMin(nc._t.start) - toMin(nowHM())) : '—';
 
   $('#tbStats').innerHTML = `
-    <div class="tb-stat" onclick="go('today')"><b>${cs.length}</b><span>作业</span></div>
+    <div class="tb-stat" onclick="go('today')"><b>${cs.length}</b><span>今日课程</span></div>
     <div class="tb-stat" onclick="go('today')"><b>${todo}</b><span>待办作业</span></div>
     <div class="tb-stat" onclick="go('today')"><b>${nt}</b><span>距下节课</span></div>
     <div class="tb-stat" onclick="go('package')"><b>${lowPkg || gPackages().filter(p => p.status !== 'done' && !pkgExpired(p)).length}</b><span>${lowPkg ? '课包告急' : '在读课包'}</span></div>`;
