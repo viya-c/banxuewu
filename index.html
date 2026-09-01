@@ -624,8 +624,8 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.41';
-const BUILD_NO = '20260901c';
+const APP_VERSION = '1.0.42';
+const BUILD_NO = '20260901d';
 const BUILD_TIME = '2026-08-30';
 const HOUSEHOLD_ID = 'default';
 
@@ -936,10 +936,21 @@ function migrateGrades(DB) {
     } else {
       const exById = {}, exByName = {};
       g.terms.forEach(t => { exById[t.id] = t; if (t.name) exByName[t.name] = t; });
-      g.terms = defs.map(d => {
+      const merged = defs.map(d => {
         const ex = exById[d.id] || exByName[d.name] || null;
-        return ex ? { id: ex.id, name: ex.name || d.name, start: ex.start || d.start, end: ex.end || d.end } : d;
+        if (!ex) return d;
+        // 关键：必须保留各学期独立的作息（periods / extendPeriods）。
+        // 旧实现只重建 id/name/start/end 四个字段，把用户改好的作息整份丢掉，
+        // 导致每次同步后课表退回全局默认作息、作息设置里也变成默认值。
+        const out = { ...d, ...ex, id: ex.id || d.id, name: ex.name || d.name, start: ex.start || d.start, end: ex.end || d.end };
+        if (!Array.isArray(out.periods)) out.periods = d.periods.map(p => ({ ...p }));
+        if (!Array.isArray(out.extendPeriods)) out.extendPeriods = d.extendPeriods.map(p => ({ ...p }));
+        return out;
       });
+      // 保留用户自定义学期（不在默认四个阶段里的），否则会被静默丢弃
+      const defIds = new Set(defs.map(d => d.id)), defNames = new Set(defs.map(d => d.name));
+      const custom = g.terms.filter(t => !defIds.has(t.id) && !(t.name && defNames.has(t.name)));
+      g.terms = custom.length ? merged.concat(custom) : merged;
     }
     if (!g.currentTermId || !g.terms.some(t => t.id === g.currentTermId)) g.currentTermId = g.terms[0].id;
     const def = g.currentTermId;
@@ -1014,6 +1025,7 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.42', date: '2026-09-01', items: ['★修复作息保存不住的元凶：数据迁移函数在每次同步时重建学期，只保留「编号 / 名称 / 起止日期」四个字段，把各学期独立的作息整个丢掉（1.0.38 增加「作息按学期隔离」时这段老代码没跟着升级）。表现为 ①课表时间始终走全局默认作息，改了不生效 ②重新点进作息设置显示为默认值 ③保存后 15 秒又被下一次同步抹掉。现在迁移保留每个学期自己的作息', '顺带修复：在年级设置里添加的自定义学期（不在「上学期 / 寒假 / 暑假 / 下学期」四个默认阶段里的）每次同步会被静默丢弃，现在保留', '提醒：此前被抹掉的作息已随同步写进了 GitHub，无法自动找回，推本版后请在「作息设置」里重新设一次（这次能存住）'] },
       { version: '1.0.41', date: '2026-09-01', items: ['修复「作息改了又退回去」场景一（写入失败）：保存时写 GitHub 若遇限流/网络抖动，本地界面先变了、远端却没写上，15 秒后轮询把旧数据拉回来覆盖 → 退回。现在限流与网络错误自动退避重试（最多 3 次，隔 2 秒 / 5 秒），大幅降低保存失败率', '修复场景二（多设备覆盖）：本应用是整份数据文件一次性覆盖写入，家里其它设备（孩子平板 / 家人手机）若挂着旧页面，它做任何操作（哪怕点个打卡、切个学期）都会把内存里的旧数据整份写回 GitHub，盖掉你刚保存的作息 → 退回。现在每次写入前先拉远端最新数据做基底，旧页面再写入也不会覆盖别人刚存的改动'] },
       { version: '1.0.40', date: '2026-09-01', items: ['修复「作息改了又退回去」：保存作息（保存按钮 / 加一节 / 删一节）时后台写 GitHub 需要几秒，这期间 15 秒轮询会把远端旧数据拉回来覆盖本地，界面退回改动前；现在写入期间暂停轮询，写完才恢复', '同款修复「刚切的学期又跳回去」：切学期是后台静默保存，写入期间同样会被轮询拉回旧学期，已一并修复', '加/删一节以前保存失败只在后台静默报错，现在会弹出提示（限流 / 数据冲突能看到原因）'] },
       { version: '1.0.39', date: '2026-09-01', items: ['单双周自动显示：课表按「当前查看周」的奇偶性自动显示单/双周课（第1周=单周、第2周=双周…），不再需要手动切「单双周视图」——翻到第几周就显示那一周该上的课；原来的「单/双周」切换按钮已删除', '周导航条现在标注当前周是「单周」还是「双周」（如「第 3 周 / 20 · 单周」），一眼看清这周显示的是哪类课', '列表视图也按当周单双周过滤（之前列表视图完全没过滤单双周，现与周视图一致）', '今天标识更醒目：表头、今天课程格子、列表「今天」标题都加了一个内联 SVG 圆点图标，不再只靠颜色区分——之前今天蓝底白字和课程蓝色基调太接近、不够明显'] },
