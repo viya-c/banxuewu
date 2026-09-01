@@ -624,8 +624,8 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.39';
-const BUILD_NO = '20260901a';
+const APP_VERSION = '1.0.40';
+const BUILD_NO = '20260901b';
 const BUILD_TIME = '2026-08-30';
 const HOUSEHOLD_ID = 'default';
 
@@ -1014,6 +1014,7 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.40', date: '2026-09-01', items: ['修复「作息改了又退回去」：保存作息（保存按钮 / 加一节 / 删一节）时后台写 GitHub 需要几秒，这期间 15 秒轮询会把远端旧数据拉回来覆盖本地，界面退回改动前；现在写入期间暂停轮询，写完才恢复', '同款修复「刚切的学期又跳回去」：切学期是后台静默保存，写入期间同样会被轮询拉回旧学期，已一并修复', '加/删一节以前保存失败只在后台静默报错，现在会弹出提示（限流 / 数据冲突能看到原因）'] },
       { version: '1.0.39', date: '2026-09-01', items: ['单双周自动显示：课表按「当前查看周」的奇偶性自动显示单/双周课（第1周=单周、第2周=双周…），不再需要手动切「单双周视图」——翻到第几周就显示那一周该上的课；原来的「单/双周」切换按钮已删除', '周导航条现在标注当前周是「单周」还是「双周」（如「第 3 周 / 20 · 单周」），一眼看清这周显示的是哪类课', '列表视图也按当周单双周过滤（之前列表视图完全没过滤单双周，现与周视图一致）', '今天标识更醒目：表头、今天课程格子、列表「今天」标题都加了一个内联 SVG 圆点图标，不再只靠颜色区分——之前今天蓝底白字和课程蓝色基调太接近、不够明显'] },
       { version: '1.0.38', date: '2026-08-31', items: ['作息按学期隔离：正课/延时课的「第几节对应几点」改为每个学期独立一份节次表（原来年级全局共用一份 settings.periods，改一处全学期跟着变），现在上学期/寒假/暑假/下学期的上下课时间可分别设置、互不影响', '课表渲染、课程表单节次下拉、批量录入表格、作息设置页全部按「当前学期」取对应节次表', '课程按 termId 自动用该学期作息；长线课（不指定学期）跟随当前查看的学期', '老数据自动迁移：学期无节次表的注入默认 7 节正课 + 2 节延时；设置页改作息只写回当前学期，不污染其它学期'] },
       { version: '1.0.37', date: '2026-08-31', items: ['切学期丝滑化：原来每切一次学期（上学期/寒假/暑假/下学期）都触发全量 refresh（重新从服务端拉全部数据 + 重建整页），在资料库限流下明显卡顿；现在改为本地即时重绘当前页与顶栏/角标，只后台静默写回学期选择，无全量重载', '顺带确认：课程按 termId 分学期显示、互不影响（寒假/暑假没排的课不显示）；但正课/延时课的「节次作息表」目前是年级全局共用一份 settings.periods，不随学期隔离'] },
@@ -1739,7 +1740,11 @@ async function switchTerm(id) {
   if (RENDER[S.page]) RENDER[S.page]();
   updateBadge();
   // 后台静默持久化当前学期选择，失败不阻塞界面
-  api('/grades/' + g.id, { method: 'PUT', body: { currentTermId: id } }).catch(() => {});
+  // 写入期间置 __SAVING：防止轮询把远端旧 currentTermId 拉回来，导致刚切的学期又跳回去
+  window.__SAVING = true;
+  api('/grades/' + g.id, { method: 'PUT', body: { currentTermId: id } })
+    .catch(() => {})
+    .finally(() => { window.__SAVING = false; });
 }
 
 /** 课程时间（返回 {start,end}） */
@@ -2563,12 +2568,14 @@ function periodForm() {
           }));
         };
         try {
+          window.__SAVING = true;   // 写入 GitHub 挂起期间禁止轮询回写，防止远端旧数据覆盖刚保存的作息
           const np = collect('periods'), ne = collect('extendPeriods');
           const terms = g.terms.map(t => t.id === curTerm() ? { ...t, periods: np, extendPeriods: ne } : t);
           await api('/grades/' + g.id, { method: 'PUT', body: { terms } });
           await api('/settings', { method: 'PUT', body: { showWeekend: isOn('psWeekend') } });
           await refresh(); closeSheet(); toast((term.name || '当前学期') + ' 作息已更新');
         } catch (e) { toast(e.message); }
+        finally { window.__SAVING = false; }
       };
     });
 }
@@ -2580,8 +2587,12 @@ async function addPeriod(key) {
   const st = last ? minToHM(toMin(last.end) + 10) : '08:00';
   arr.push({ name: (key === 'periods' ? '第' + (arr.length + 1) + '节' : '延时' + (arr.length + 1)), start: st, end: minToHM(toMin(st) + 40) });
   const terms = g.terms.map(t => t.id === curTerm() ? { ...t, [key]: arr } : t);
-  await api('/grades/' + g.id, { method: 'PUT', body: { terms } });
-  await refresh(); periodForm();
+  window.__SAVING = true;   // 写入期间禁轮询，防远端旧数据覆盖
+  try {
+    await api('/grades/' + g.id, { method: 'PUT', body: { terms } });
+    await refresh(); periodForm();
+  } catch (e) { toast(e.message); }
+  finally { window.__SAVING = false; }
 }
 async function rmPeriod(key, i) {
   const g = curGrade(); if (!g) return;
@@ -2589,8 +2600,12 @@ async function rmPeriod(key, i) {
   const arr = (key === 'extendPeriods' ? (term.extendPeriods || []) : (term.periods || [])).slice();
   arr.splice(i, 1);
   const terms = g.terms.map(t => t.id === curTerm() ? { ...t, [key]: arr } : t);
-  await api('/grades/' + g.id, { method: 'PUT', body: { terms } });
-  await refresh(); periodForm();
+  window.__SAVING = true;   // 写入期间禁轮询，防远端旧数据覆盖
+  try {
+    await api('/grades/' + g.id, { method: 'PUT', body: { terms } });
+    await refresh(); periodForm();
+  } catch (e) { toast(e.message); }
+  finally { window.__SAVING = false; }
 }
 
 </script>
