@@ -562,7 +562,7 @@ img{max-width:100%;display:block}
       <span><i style="background:linear-gradient(150deg,#B77BEE,#9450DE)"></i>课外辅导</span>
       <span><i style="background:#FFC531;border-radius:50%"></i>有作业</span>
     </div>
-    <div class="sec-h" id="ttToolsSec"><div class="sec-t">⚙️ 课表工具</div></div>
+    <div class="sec-h" id="ttToolsSec" data-fold="tt-tools"><div class="sec-t">⚙️ 课表工具</div></div>
     <div class="card" id="ttToolsCard">
       <div class="row" style="margin-bottom:10px">
         <div class="col"><b style="font-size:13.5px">批量录入课表</b><span class="muted">一次把一周正课全部填好</span></div>
@@ -672,8 +672,8 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.46';
-const BUILD_NO = '20260901h';
+const APP_VERSION = '1.0.47';
+const BUILD_NO = '20260902a';
 const BUILD_TIME = '2026-08-30';
 const HOUSEHOLD_ID = 'default';
 
@@ -1073,6 +1073,7 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.47', date: '2026-09-02', items: ['★折叠不再误伤主功能：此前「所有分区一律默认折叠」把作业打卡的周翻页条、日期条一起藏了进去——你得先展开才能翻页，可一点翻页页面重渲染、又被折回去，看起来就像「点翻页触发了折叠」。现在只有标了折叠标记的辅助/设置区块（课表工具、提醒设置、数据与安全、更新日志、家庭成员、年级分区、积分使用、已过期/已结课、操作）默认收起；作业打卡、在读课包、成绩记录、作业记录、作息正课/延时课这类数据主体一律常驻，翻页和列表随时可用', '★折叠状态会记住：以前展开一个区块后，只要页面重渲染（翻周、改数据、切页面、刷新）就被打回默认折叠。现在展开/收起的选择按区块记在本地，重渲染和刷新后都按你的选择来；没动过的区块仍走默认收起', '折叠箭头紧跟标题右侧（标题留在左），右侧操作按钮（如「+ 加一节」）独立贴最右，三者不再互相挤压'] },
       { version: '1.0.46', date: '2026-09-01', items: ['★作业打卡日期条改为「按周翻页」：顶部加 ‹ 上一周 / 下一周 › 翻页器，可一路翻到任意过去或未来的周，点「今天」按钮回到本周；不再受原来 14 天窗口限制，更早以前的作业也能看到', '每周显示周一到周日 7 天，每天带未完成/已完成数量徽标；点某天直达当天组', '逾期作业（含今天已过点）始终置顶在「⚠️ 逾期未完成」组，翻到任意周都看得到，不会被埋进当天组；已完成作业按打卡周显示，翻到对应周才出现'] },
       { version: '1.0.45', date: '2026-09-01', items: ['★全模块分区折叠：每个功能区块（课表工具 / 作息设置 / 提醒设置 / 数据备份 / 更新日志…）标题现在可点，默认收起，点标题展开看内容——页面不再一拉到底，首屏更清爽；课程主视图、作业列表这类核心内容保持常驻', '更新日志只显示最近 3 条，点「查看全部 N 条」展开完整历史', '折叠头用内联 SVG 箭头（收起时朝下、展开时朝右），不是 emoji'] },
       { version: '1.0.44', date: '2026-09-01', items: ['★性能优化：1.0.41 加的「写入前先拉远端」防覆盖机制，让每一次保存都多一次网络往返，切学期 / 翻页 / 保存时能明显感到变慢。现在给这次预拉加了 9 秒节流：连续操作只预拉一次，单次操作仍照常预拉，防覆盖效果不打折、速度回到从前；写入失败的重试等待也从 2 秒 / 5 秒缩短到 1 秒 / 2 秒',
@@ -3344,7 +3345,7 @@ function renderPackages() {
   }).join('');
 
   if (expired.length) {
-    h += `<div class="sec-h"><div class="sec-t">⏰ 已过期 <small>${expired.length} 个 · 不在在读列表，可删除</small></div>
+    h += `<div class="sec-h" data-fold="pkg-expired"><div class="sec-t">⏰ 已过期 <small>${expired.length} 个 · 不在在读列表，可删除</small></div>
       ${canEdit('package') ? `<button class="btn xs ghost" onclick="clearExpiredPkgs()">一键清空</button>` : ''}</div>`;
     h += expired.map(p => `<div class="card flat" style="opacity:.85" onclick="pkgDetail('${p.id}')">
       <div class="row"><div class="col grow"><b class="ell" style="font-size:14px">${emojiOf(p.subject)} ${esc(p.name)}</b>
@@ -3356,7 +3357,7 @@ function renderPackages() {
   }
 
   if (done.length) {
-    h += `<div class="sec-h"><div class="sec-t">📦 已结课 <small>${done.length} 个</small></div></div>`;
+    h += `<div class="sec-h" data-fold="pkg-done"><div class="sec-t">📦 已结课 <small>${done.length} 个</small></div></div>`;
     h += done.map(p => `<div class="card flat" onclick="pkgDetail('${p.id}')">
       <div class="row"><div class="col grow"><b class="ell" style="font-size:14px">${emojiOf(p.subject)} ${esc(p.name)}</b>
         <span class="muted">${p.stats.consumed}/${p.stats.total} 课时${p.rolledHours ? ' · 已结转' + p.rolledHours + '课时' : ''} · ${esc(p.org || '')}</span></div>
@@ -3504,7 +3505,7 @@ function sessionActions(pkgId, sid) {
       ${s.rescheduled && s.origDate ? `<p class="muted" style="margin-top:6px">↪ 已从 <b>${fmtDate(s.origDate)} ${WD[new Date(s.origDate + 'T00:00:00').getDay()]}</b> 调至 <b>${fmtDate(s.plannedDate)} ${WD[Number(s.weekday)]}</b></p>` : (s.rescheduled ? `<p class="muted" style="margin-top:6px">↪ 该课次已调课</p>` : '')}
       ${lv && s.makeupOf ? `<p class="muted" style="margin-top:6px">已安排补课</p>` : ''}
     </div>
-    <div class="sec-h"><div class="sec-t">操作</div></div>
+    <div class="sec-h" data-fold="pkg-actions"><div class="sec-t">操作</div></div>
     ${sessOpsHTML(p, s)}`;
   const foot = `<button class="btn ghost" onclick="pkgDetail('${pkgId}')">返回课包</button>`;
   openSheet('课次详情', body, foot);
@@ -4364,7 +4365,7 @@ function hwStatsHTML() {
   const uses = (S.data.points || []).filter(p => p.gradeId === gid())
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   if (uses.length) {
-    h += `<div class="sec-h"><div class="sec-t" style="font-size:13.5px;color:var(--mu)">🎁 积分使用 <small>${uses.length} 笔 · 共 ${sum.used} 分</small></div></div>`;
+    h += `<div class="sec-h" data-fold="pts-uses"><div class="sec-t" style="font-size:13.5px;color:var(--mu)">🎁 积分使用 <small>${uses.length} 笔 · 共 ${sum.used} 分</small></div></div>`;
     h += uses.map(p => {
       const click = isAdmin() ? ` onclick="pointUseForm('${p.id}')"` : '';
       return `<div class="card"${click}><div class="row"><div class="col grow">
@@ -4610,7 +4611,7 @@ function renderMe() {
     </div></div>`;
 
   // 当前使用者
-  h += `<div class="sec-h"><div class="sec-t">👨‍👩‍👧 家庭成员 <small>${S.data.members.length} 人</small></div>
+  h += `<div class="sec-h" data-fold="me-family"><div class="sec-t">👨‍👩‍👧 家庭成员 <small>${S.data.members.length} 人</small></div>
     ${canEdit('settings') ? `<button class="btn xs" onclick="memberForm()">+ 添加</button>` : ''}</div>
     <div class="card">`;
   h += S.data.members.map((m, i) => {
@@ -4626,7 +4627,7 @@ function renderMe() {
     <button class="btn block ghost sm" style="margin-top:9px" onclick="shareInfo()">📤 分享给家人</button></div>`;
 
   // 年级分区
-  h += `<div class="sec-h"><div class="sec-t">🎓 年级分区 <small>数据独立互不干扰</small></div>
+  h += `<div class="sec-h" data-fold="me-grades"><div class="sec-t">🎓 年级分区 <small>数据独立互不干扰</small></div>
     ${canEdit('settings') ? `<button class="btn xs" onclick="gradeForm()">+ 新建</button>` : ''}</div><div class="card">`;
   h += grades.map((x, i) => `<div class="list-i" style="${i === grades.length - 1 ? 'border-bottom:none' : ''}">
       <div class="list-ic" style="background:${x.current ? 'rgba(91,140,255,.14)' : '#F0F3FC'}">${x.current ? '📗' : '📘'}</div>
@@ -4637,7 +4638,7 @@ function renderMe() {
   h += `</div>`;
 
   // 提醒
-  h += `<div class="sec-h"><div class="sec-t">🔔 提醒设置</div>
+  h += `<div class="sec-h" data-fold="me-remind"><div class="sec-t">🔔 提醒设置</div>
     ${canEdit('settings') ? `<button class="btn xs ghost" id="notifyBtn" onclick="askNotify()">开启通知</button>` : ''}</div>
     <div class="card">
       ${fSwitch('rmClass', '上课提醒', `上课前 ${r.classBefore} 分钟提醒`, r.enableClass)}
@@ -4655,7 +4656,7 @@ function renderMe() {
 
   // 数据（仅管理员可见）
   if (canEdit('settings')) {
-  h += `<div class="sec-h"><div class="sec-t">🗄 数据与安全</div></div><div class="card">
+  h += `<div class="sec-h" data-fold="me-data"><div class="sec-t">🗄 数据与安全</div></div><div class="card">
     <div class="list-i"><div class="list-ic">🔑</div><div class="col grow"><b style="font-size:14px">家庭访问码</b>
       <span class="muted">当前：${esc(f.accessCode || '未设置')}</span></div>
       <button class="btn xs ghost" onclick="codeForm()">修改</button></div>
@@ -4678,7 +4679,7 @@ function renderMe() {
 
   // 更新日志：默认只显示最近 3 条，点「查看全部」展开历史完整记录
   const clogAll = S.data.changelog || [];
-  h += `<div class="sec-h"><div class="sec-t">📋 更新日志</div></div><div class="card">`;
+  h += `<div class="sec-h" data-fold="me-changelog"><div class="sec-t">📋 更新日志</div></div><div class="card">`;
   h += clogAll.slice(0, 3).map(clogItemHTML).join('');
   if (clogAll.length > 3) h += `<div class="clog-more" onclick="showAllClog(this)">查看全部 ${clogAll.length} 条 ▾</div>`;
   h += `</div>`;
@@ -5023,7 +5024,16 @@ const RENDER = {
   me: renderMe
 };
 
-/* ---------- 分区折叠：每个区块标题可点，默认收起，点标题展开 ---------- */
+/* ---------- 分区折叠 ----------
+   规则：只有标了 data-fold="key" 的「辅助 / 设置 / 次要」区块才可折叠；
+   数据主体区块（作业打卡、在读课包、成绩记录、作息正课…）不加该属性，永远常驻——
+   否则一折叠就把周翻页、列表内容全藏起来，功能直接失效。
+   折叠状态按 key 记在 localStorage：首次默认收起，之后以你手动展开/收起的结果为准，
+   重渲染（翻周、改数据、切页面）或刷新后都保持，不会被重置。 */
+const FOLD_KEY = 'wb_fold_v1';
+let FOLD_STATE = (() => { try { return JSON.parse(localStorage.getItem(FOLD_KEY) || '{}') || {}; } catch (_) { return {}; } })();
+function saveFoldState() { try { localStorage.setItem(FOLD_KEY, JSON.stringify(FOLD_STATE)); } catch (_) { } }
+
 function setFold(secH, collapsed) {
   if (!secH) return;
   secH.classList.toggle('collapsed', collapsed);
@@ -5035,6 +5045,8 @@ function setFold(secH, collapsed) {
 }
 function wireFold(secH) {
   if (!secH || secH.dataset.fw) return;
+  const fk = secH.getAttribute('data-fold');
+  if (!fk) return;                       // 未标记 = 核心内容，常驻不折叠
   secH.dataset.fw = '1';
   secH.classList.add('foldable');
   const ar = document.createElement('span');
@@ -5043,7 +5055,9 @@ function wireFold(secH) {
   const t = secH.querySelector('.sec-t');
   if (t) t.insertAdjacentElement('afterend', ar);   // 箭头紧跟标题右侧（标题留在左），不破坏 flex 布局
   else secH.appendChild(ar);
-  setFold(secH, true);   // 默认折叠：进来每个分区都是收起的，点标题展开
+  // 首次（无记录）默认收起；之后用记忆的状态 —— 翻周/改数据/刷新都不会被打回原形
+  const saved = FOLD_STATE[fk];
+  setFold(secH, saved === undefined ? true : !saved);
 }
 function wireFolds(root) {
   if (!root) return;
@@ -5064,7 +5078,10 @@ document.addEventListener('click', e => {
   const h = e.target.closest ? e.target.closest('.sec-h') : null;
   if (!h || !h.classList.contains('foldable')) return;
   if (e.target.closest('button, a, [onclick]')) return;   // 不拦截区块内的操作按钮（如「+ 加一节」）
-  setFold(h, !h.classList.contains('collapsed'));
+  const open = h.classList.contains('collapsed');         // 当前收起 → 这次是展开
+  setFold(h, !open);
+  const fk = h.getAttribute('data-fold');
+  if (fk) { FOLD_STATE[fk] = open; saveFoldState(); }     // 记住你的选择，之后不再被打回默认
 });
 
 function clogItemHTML(c) {
