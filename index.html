@@ -98,15 +98,17 @@ img{max-width:100%;display:block}
 .page.on{display:block}
 @keyframes fadeUp{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
 
-.sec-h{display:flex;align-items:center;justify-content:space-between;margin:16px 2px 9px;gap:8px}
+.sec-h{display:flex;align-items:center;margin:16px 2px 9px;gap:8px}
 .sec-h:first-child{margin-top:2px}
 /* 分区折叠：每个区块标题可点，默认收起，点标题展开看内容 */
 [hidden]{display:none!important}
 .sec-h.foldable{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .sec-h.foldable .sec-t{pointer-events:none}  /* 点标题任意处都触发折叠，不拦截 */
 .sec-h .fold-ar{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;color:var(--mu);flex:none;transition:transform .18s}
-.sec-h.collapsed .fold-ar{transform:rotate(-90deg)}
+.sec-h.collapsed .fold-ar{transform:rotate(90deg)}   /* 收起时箭头朝右 ▶（点我展开）；展开时朝下 ▼ */
 .sec-h .fold-ar svg{display:block}
+/* 右侧操作按钮（如「+ 加一节」「查看全部」）始终推到最右，标题 + 折叠箭头留在左侧 */
+.sec-h > button, .sec-h > .btn{margin-left:auto}
 .clog-more{margin-top:9px;font-size:12.5px;font-weight:700;color:var(--main);text-align:center;cursor:pointer;padding:7px 0;border-top:1px dashed var(--bd)}
 .sec-t{font-size:15.5px;font-weight:800;display:flex;align-items:center;gap:6px}
 .sec-t small{font-size:11.5px;color:var(--mu);font-weight:600}
@@ -280,9 +282,7 @@ img{max-width:100%;display:block}
 .hw-imgs{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap}
 .hw-imgs img{width:52px;height:52px;object-fit:cover;border-radius:9px;border:1px solid var(--bd)}
 
-/* ---------- 作业：14天日期条 + 按日期分组 ---------- */
-.hw-bar{display:flex;gap:7px;overflow-x:auto;padding:2px 2px 8px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-.hw-bar::-webkit-scrollbar{display:none}
+/* ---------- 作业：按周翻页日期条 + 按日期分组 ---------- */
 .hw-day{flex:0 0 auto;width:50px;padding:7px 0 6px;border-radius:13px;background:#fff;border:1.5px solid var(--bd);text-align:center;cursor:pointer;transition:.15s}
 .hw-day:active{transform:scale(.94)}
 .hw-day .w{display:block;font-size:11px;font-weight:700;color:var(--tx2)}
@@ -295,6 +295,17 @@ img{max-width:100%;display:block}
 .hw-day.today .n{background:#fff;color:var(--today)}
 .hw-day.today .n.warn{color:var(--warn)}
 .hw-day.on{border-color:var(--main);box-shadow:0 0 0 2px rgba(91,140,255,.18)}
+/* 作业日期条：按周翻页（可看任意周，不再限于最近14天） */
+.hw-weekbar{display:flex;align-items:center;gap:7px;background:var(--card);border-radius:14px;padding:7px 9px;box-shadow:var(--sh);margin-bottom:9px}
+.hw-weekbar .wb-arrow{width:34px;height:34px;flex:0 0 auto;border:none;border-radius:50%;background:#EEF2FB;color:var(--main);font-size:20px;font-weight:800;line-height:1;cursor:pointer;transition:.15s;display:grid;place-items:center}
+.hw-weekbar .wb-arrow:active{transform:scale(.9);background:#E0E7F7}
+.hw-weekbar .wb-mid{flex:1;min-width:0;text-align:center;line-height:1.25}
+.hw-weekbar .wb-lab{display:block;font-size:13.5px;font-weight:800;color:var(--tx1)}
+.hw-weekbar .wb-sub{display:block;font-size:10.5px;color:var(--mu);margin-top:1px}
+.hw-weekbar .wb-today{width:34px;height:34px;flex:0 0 auto;border:1.6px solid var(--main);border-radius:50%;background:#fff;color:var(--main);font-size:12px;font-weight:800;cursor:pointer;transition:.15s}
+.hw-weekbar .wb-today:active{transform:scale(.9);background:rgba(91,140,255,.08)}
+.hw-bar{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding:2px 1px 4px;-webkit-overflow-scrolling:touch}
+.hw-bar::-webkit-scrollbar{display:none}
 .hw-g{margin-bottom:9px}
 .hw-g-hd{display:flex;align-items:center;gap:8px;padding:10px 13px;background:var(--card);border:1px solid var(--bd);border-radius:13px;cursor:pointer;box-shadow:var(--sh);min-height:44px}
 .hw-g-hd:active{transform:scale(.995)}
@@ -661,8 +672,8 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.45';
-const BUILD_NO = '20260901g';
+const APP_VERSION = '1.0.46';
+const BUILD_NO = '20260901h';
 const BUILD_TIME = '2026-08-30';
 const HOUSEHOLD_ID = 'default';
 
@@ -1062,6 +1073,7 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.46', date: '2026-09-01', items: ['★作业打卡日期条改为「按周翻页」：顶部加 ‹ 上一周 / 下一周 › 翻页器，可一路翻到任意过去或未来的周，点「今天」按钮回到本周；不再受原来 14 天窗口限制，更早以前的作业也能看到', '每周显示周一到周日 7 天，每天带未完成/已完成数量徽标；点某天直达当天组', '逾期作业（含今天已过点）始终置顶在「⚠️ 逾期未完成」组，翻到任意周都看得到，不会被埋进当天组；已完成作业按打卡周显示，翻到对应周才出现'] },
       { version: '1.0.45', date: '2026-09-01', items: ['★全模块分区折叠：每个功能区块（课表工具 / 作息设置 / 提醒设置 / 数据备份 / 更新日志…）标题现在可点，默认收起，点标题展开看内容——页面不再一拉到底，首屏更清爽；课程主视图、作业列表这类核心内容保持常驻', '更新日志只显示最近 3 条，点「查看全部 N 条」展开完整历史', '折叠头用内联 SVG 箭头（收起时朝下、展开时朝右），不是 emoji'] },
       { version: '1.0.44', date: '2026-09-01', items: ['★性能优化：1.0.41 加的「写入前先拉远端」防覆盖机制，让每一次保存都多一次网络往返，切学期 / 翻页 / 保存时能明显感到变慢。现在给这次预拉加了 9 秒节流：连续操作只预拉一次，单次操作仍照常预拉，防覆盖效果不打折、速度回到从前；写入失败的重试等待也从 2 秒 / 5 秒缩短到 1 秒 / 2 秒',
 '新增「保存中」徽标：写 GitHub 要 1~3 秒，此前点完保存毫无反馈，主观上就是「卡住了」。现在顶栏会显示一个脉冲小徽标，写完自动消失（同时也肉眼可见这次保存到底花了多久）', '课表分区配色：上午（青绿）、下午（琥珀）、延时服务（橙）、课外辅导（紫）四段各有底色与文字色，左侧节次号同步着色，一眼分清哪几节属于哪个时段', '正课不再固定「前 4 节上午」，改为按作息时间自动切分：开始时间早于 12:00 归上午、否则归下午（作息未填时间时才退回按节次号估算）', '去掉「今天」的蓝色：课表表头、今天格子、列表视图「今天」标题、作业区日期条，四处统一改用中性石板灰 #475569。原来的蓝和正课蓝撞色、看不出是「今天」，现在与课程色系彻底分开（靠灰色 + 圆点图标双重标识，仍然一眼看到）'] },
@@ -2756,29 +2768,45 @@ function nextCourse() {
   return todayCourses().find(c => toMin(c._t.start) > now) || null;
 }
 
-/* ---------- 作业区：14 天日期条 + 按日期分组 ----------
-   解决「今天有什么 / 明天有什么 / 前天完成了什么 / 这周还剩什么」全看不出来的问题：
-   顶部横向日期条（本周一→下周日共 14 天，可滑动、自动定位到今天、带每日数量徽标），
-   下方按「逾期 / 今天 / 明天 / 具体某天 / 更远 / 未设截止日 / 已完成某天」分组折叠展示。 */
-// 折叠态：HW_OPEN[分组key]=true/false；未记录过的 key 走默认展开规则（逾期+今天+明天）
+/* ---------- 作业区：按周翻页日期条 + 按日期分组 ----------
+   解决「今天有什么 / 明天有什么 / 前天完成了什么 / 这周还剩什么 / 更早的某天做了什么」全看不出来的问题：
+   顶部按周翻页（‹ 上一周 / 下一周 ›，可一路翻到任意过去或未来的周，点「今天」回到本周），
+   下方按「逾期 / 本周每天（未完成+已完成） / 未设截止日」分组折叠展示。不再受 14 天窗口限制。 */
+// 折叠态：HW_OPEN[分组key]=true/false；未记录过的 key 走默认展开规则（有内容的当天组默认展开）
 let HW_OPEN = {};
-let HW_MORE_DONE = false;   // 是否已展开「更早的已完成」
 let HW_PICK = '';           // 日期条当前选中的日期，空表示默认选今天
+let HW_WEEK_MON = '';       // 作业日期条当前显示周的周一；空=本周（点「今天」复位）
 
 /** 逾期判定（口径单点维护，分组与卡片共用）：未完成 + 有截止日 + 截止时间已过；缺 dueTime 按当天 23:59 算 */
 const hwOverdue = (x) => x.status !== 'done' && !!x.dueDate &&
   (x.dueDate + ' ' + (x.dueTime || '23:59')) < (today() + ' ' + nowHM());
 
-/** 日期条覆盖：本周一 → 下周日，共 14 天 */
-function hw14Days() {
-  const first = mondayOf(today());
+/** 当前日期条显示周的周一（空 = 本周一） */
+function hwWeekMon() { return HW_WEEK_MON || mondayOf(today()); }
+
+/** 显示周的 7 天（周一→周日） */
+function hwWeekDays() {
+  const mon = hwWeekMon();
   const out = [];
-  for (let i = 0; i < 14; i++) {
-    const d = new Date(first + 'T00:00:00');
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(mon + 'T00:00:00');
     d.setDate(d.getDate() + i);
     out.push(ymd(d));
   }
   return out;
+}
+
+/** 周导航条文案：日期范围 + 相对本周的说法 */
+function hwWeekLabel() {
+  const mon = hwWeekMon();
+  const m1 = new Date(mon + 'T00:00:00');
+  const m2 = new Date(mon + 'T00:00:00'); m2.setDate(m2.getDate() + 6);
+  const fmt = d => `${d.getMonth() + 1}月${d.getDate()}日`;
+  const range = fmt(m1) + ' – ' + fmt(m2);
+  const off = Math.round((m1 - new Date(mondayOf(today()) + 'T00:00:00')) / 604800000);
+  const rel = off === 0 ? '本周' : off === 1 ? '下周' : off === -1 ? '上周'
+    : off < 0 ? (-off) + '周前' : off + '周后';
+  return { range, rel };
 }
 
 /** 分组标题里的日期文案：今天 / 明天 / 昨天 / 周三 8月20日 */
@@ -2802,28 +2830,33 @@ function hwGroupOpen(g) {
   return !!g.defOpen;
 }
 
-/** 把作业切成有序分组。返回 { defs:[{key,title,sub,tone,items,defOpen}], hiddenN, pendN } */
+/** 把作业切成有序分组（基于当前显示的周，不再有 14 天窗口）。返回 { defs, hiddenN, pendN } */
 function hwGroupDefs(hws) {
-  const days = hw14Days();
-  const winEnd = days[days.length - 1];
+  const week = hwWeekDays();
+  const inWeek = new Set(week);
   const t = today();
-  const ov = [], day = {}, far = [], nod = [];
-  const doneDay = {}, doneNone = [];
+  const ov = [], day = {}, nod = [];
 
   (hws || []).forEach(x => {
     if (x.status === 'done') {
+      // 已完成：只在打卡日落在当前显示周时归入当天组；翻到那周才看得到
       const k = (x.checkinAt || '').slice(0, 10);
-      if (k) (doneDay[k] = doneDay[k] || []).push(x); else doneNone.push(x);
+      if (k && inWeek.has(k)) (day[k] = day[k] || []).push(x);
       return;
     }
     if (!x.dueDate) { nod.push(x); return; }
-    if (hwOverdue(x)) { ov.push(x); return; }          // 今天已过截止时间的也归逾期
-    if (x.dueDate > winEnd) { far.push(x); return; }   // 超出 14 天窗口
-    (day[x.dueDate] = day[x.dueDate] || []).push(x);
+    if (hwOverdue(x)) { ov.push(x); return; }   // 先判逾期：任何已逾期（含今天已过点）都置顶提醒，不被埋进当天组
+    if (inWeek.has(x.dueDate)) { (day[x.dueDate] = day[x.dueDate] || []).push(x); return; }
+    // 其余：未到本周的将来作业，翻到那周才显示
   });
 
-  const byDue = (a, b) => (a.dueDate + (a.dueTime || '23:59')).localeCompare(b.dueDate + (b.dueTime || '23:59'));
-  const byDone = (a, b) => (b.checkinAt || '').localeCompare(a.checkinAt || '');
+  const byKind = (a, b) => {
+    const da = a.status === 'done' ? 1 : 0, db = b.status === 'done' ? 1 : 0;
+    if (da !== db) return da - db;                       // 未完成在前、已完成在后
+    const ta = a.dueDate || (a.checkinAt || '').slice(0, 10) || '';
+    const tb = b.dueDate || (b.checkinAt || '').slice(0, 10) || '';
+    return ta.localeCompare(tb) || (a.dueTime || '23:59').localeCompare(b.dueTime || '23:59');
+  };
   const defs = [];
   let pendN = 0;
 
@@ -2832,70 +2865,56 @@ function hwGroupDefs(hws) {
     defs.push({
       key: 'ov', tone: 'ov', defOpen: true,
       title: '⚠️ 逾期未完成', sub: `${ov.length} 项 · 已过截止时间`,
-      items: ov.slice().sort(byDue)
+      items: ov.slice().sort(byKind)
     });
   }
-  Object.keys(day).sort().forEach(d => {
+  week.forEach(d => {
+    const items = day[d] || [];
+    if (!items.length) return;                  // 当天没作业就不堆空组
     const rd = relDays(d);
-    pendN += day[d].length;
+    pendN += items.filter(x => x.status !== 'done').length;
+    const icon = rd === 0 ? '📌' : rd === 1 ? '🌅' : rd === -1 ? '🌙' : '🗓';
+    const tip = rd === 0 ? ' · 今天要做完' : rd === 1 ? ' · 提前了解' : rd === -1 ? ' · 昨天该做的' : rd < 0 ? ' · 已过去' : '';
     defs.push({
-      key: 'd:' + d, tone: rd === 0 ? 'tdy' : '', defOpen: rd === 0 || rd === 1,
-      title: `${rd === 0 ? '📌' : rd === 1 ? '🌅' : '🗓'} ${hwDayTitle(d)}`,
-      sub: `${day[d].length} 项${rd === 0 ? ' · 今天要做完' : rd === 1 ? ' · 提前了解' : rd < 0 ? ' · 已过去未完成' : ''}`,
-      items: day[d].slice().sort(byDue)
+      key: 'd:' + d, tone: rd === 0 ? 'tdy' : '', defOpen: true,
+      title: `${icon} ${hwDayTitle(d)}`, sub: `${items.length} 项${tip}`,
+      items: items.slice().sort(byKind)
     });
   });
-  if (far.length) {
-    pendN += far.length;
-    defs.push({ key: 'far', tone: '', defOpen: false, title: '🗓 更远的安排', sub: `${far.length} 项 · 两周以后`, items: far.slice().sort(byDue) });
-  }
   if (nod.length) {
     pendN += nod.length;
     defs.push({ key: 'nod', tone: '', defOpen: false, title: '📋 未设截止日', sub: `${nod.length} 项`, items: nod });
   }
-
-  // 已完成按「打卡日」倒序（不是截止日），默认只显示最近 3 个有完成记录的日期
-  const doneKeys = Object.keys(doneDay).sort().reverse();
-  const showAll = HW_MORE_DONE || (doneKeys.length + (doneNone.length ? 1 : 0)) <= 3;
-  const shownKeys = showAll ? doneKeys : doneKeys.slice(0, 3);
-  shownKeys.forEach(k => {
-    defs.push({
-      key: 'c:' + k, tone: '', defOpen: false,
-      title: `✅ ${hwDayTitle(k)}已完成`, sub: `${doneDay[k].length} 项`,
-      items: doneDay[k].slice().sort(byDone)
-    });
-  });
-  if (showAll && doneNone.length) {
-    defs.push({ key: 'c:', tone: '', defOpen: false, title: '✅ 更早完成', sub: `${doneNone.length} 项 · 无打卡时间`, items: doneNone });
-  }
-  const hiddenN = showAll ? 0
-    : doneKeys.slice(3).reduce((s, k) => s + doneDay[k].length, 0) + doneNone.length;
-  return { defs, hiddenN, pendN };
+  return { defs, hiddenN: 0, pendN };
 }
 
-/** 顶部 14 天日期条：每天显示未完成数（红色=含逾期）或已完成数（绿） */
+/** 顶部按周翻页日期条：周翻页器 + 本周 7 天芯片（每天显示未完成数=红/含逾期，或已完成数=绿） */
 function hwDateBarHTML(hws) {
   const t = today();
+  const week = hwWeekDays();
+  const inWeek = new Set(week);
   const pend = {}, done = {};
   (hws || []).forEach(x => {
     if (x.status === 'done') {
       const k = (x.checkinAt || '').slice(0, 10);
-      if (k) done[k] = (done[k] || 0) + 1;
+      if (k && inWeek.has(k)) done[k] = (done[k] || 0) + 1;
       return;
     }
     if (!x.dueDate) return;
+    if (!inWeek.has(x.dueDate)) return;
     const p = (pend[x.dueDate] = pend[x.dueDate] || { n: 0, ov: 0 });
     p.n++;
     if (hwOverdue(x)) p.ov++;
   });
-  const chips = hw14Days().map(d => {
+  const chips = week.map(d => {
     const dt = new Date(d + 'T00:00:00');
     const p = pend[d] || { n: 0, ov: 0 };
     const dn = done[d] || 0;
     const isT = d === t;
+    const sel = HW_PICK ? HW_PICK === d : isT;
     const cls = ['hw-day'];
     if (isT) cls.push('today');
-    if (HW_PICK ? HW_PICK === d : isT) cls.push('on');
+    if (sel) cls.push('on');
     const badge = p.n ? `<span class="n${p.ov ? ' warn' : ''}">${p.n}</span>`
       : dn ? `<span class="n" style="background:var(--ok)">${dn}</span>`
         : `<span class="n hide">0</span>`;
@@ -2903,7 +2922,15 @@ function hwDateBarHTML(hws) {
       <span class="w">${isT ? '今天' : WD_S[dt.getDay()]}</span>
       <span class="d">${dt.getMonth() + 1}/${dt.getDate()}</span>${badge}</div>`;
   }).join('');
-  return `<div class="hw-bar" id="hwBar">${chips}</div>`;
+  const lab = hwWeekLabel();
+  const isCur = !HW_WEEK_MON || HW_WEEK_MON === mondayOf(today());
+  const nav = `<div class="hw-weekbar">
+      <button class="wb-arrow" onclick="hwPrevWeek()" aria-label="上一周">‹</button>
+      <div class="wb-mid"><span class="wb-lab">${lab.range}</span><span class="wb-sub">${lab.rel} · 点日期看当天</span></div>
+      <button class="wb-arrow" onclick="hwNextWeek()" aria-label="下一周">›</button>
+      ${isCur ? '' : `<button class="wb-today" onclick="hwGoToday()" aria-label="回到今天">今</button>`}
+    </div>`;
+  return nav + `<div class="hw-bar" id="hwBar">${chips}</div>`;
 }
 
 /** 单个分组：body 始终渲染（CSS 控制显隐），折叠时纯 classList 切换，不重渲染、不丢滚动位置 */
@@ -2928,11 +2955,9 @@ function hwSectionHTML(hws) {
   const alive = {};
   G.defs.forEach(g => { alive[g.key] = 1; });
   Object.keys(HW_OPEN).forEach(k => { if (!alive[k]) delete HW_OPEN[k]; });
-  if (HW_MORE_DONE && !G.defs.some(g => g.key.charAt(0) === 'c')) HW_MORE_DONE = false;
 
   let h = hwDateBarHTML(hws);
   h += G.defs.map(g => hwGroupHTML(g)).join('');
-  if (G.hiddenN > 0) h += `<button class="hw-more" onclick="hwShowMoreDone()">查看更早的 ${G.hiddenN} 项 ▾</button>`;
   return h;
 }
 
@@ -2958,7 +2983,16 @@ function hwPickDay(d) {
   window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
 }
 
-function hwShowMoreDone() { HW_MORE_DONE = true; renderToday(); }
+/** 作业日期条按周翻页：上一周 / 下一周 / 回到本周（清空选择，让「今天」高亮） */
+function hwPrevWeek() {
+  const m = new Date(hwWeekMon() + 'T00:00:00'); m.setDate(m.getDate() - 7);
+  HW_WEEK_MON = ymd(m); HW_PICK = ''; renderToday();
+}
+function hwNextWeek() {
+  const m = new Date(hwWeekMon() + 'T00:00:00'); m.setDate(m.getDate() + 7);
+  HW_WEEK_MON = ymd(m); HW_PICK = ''; renderToday();
+}
+function hwGoToday() { HW_WEEK_MON = ''; HW_PICK = ''; renderToday(); }
 
 /** 首次渲染把「今天」滚到日期条可视区（只改 scrollLeft） */
 function hwScrollDateBar() {
@@ -2995,7 +3029,7 @@ function renderToday() {
   // 每日评价（态度/方法/努力，每天一次）
   h += renderDailyRating();
 
-  // 作业：14 天日期条 + 按日期分组（看今天/明天/前天完成/本周剩余）
+  // 作业：按周翻页日期条 + 按日期分组（本周每天 / 逾期 / 未设截止日，可翻到任意过去或未来周）
   const pend = hws.filter(x => x.status !== 'done').length;
   h += `<div class="sec-h"><div class="sec-t">📝 作业打卡 <small>${pend} 项待完成</small></div>
     ${canEdit('homework') ? `<button class="btn xs" onclick="hwForm()">+ 记作业</button>` : ''}</div>`;
@@ -5006,7 +5040,9 @@ function wireFold(secH) {
   const ar = document.createElement('span');
   ar.className = 'fold-ar';
   ar.innerHTML = '<svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  secH.insertBefore(ar, secH.firstChild);
+  const t = secH.querySelector('.sec-t');
+  if (t) t.insertAdjacentElement('afterend', ar);   // 箭头紧跟标题右侧（标题留在左），不破坏 flex 布局
+  else secH.appendChild(ar);
   setFold(secH, true);   // 默认折叠：进来每个分区都是收起的，点标题展开
 }
 function wireFolds(root) {
