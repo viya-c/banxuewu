@@ -693,7 +693,7 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.51';
+const APP_VERSION = '1.0.52';
 const BUILD_NO = '20260904b';
 const BUILD_TIME = '2026-09-05';
 const HOUSEHOLD_ID = 'default';
@@ -1094,6 +1094,7 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.52', date: '2026-09-05', items: ['★点日期不再乱跳：之前点作业日期条上的某天，页面会「嗖」地滚到下方打卡分组，看着很晕。现在点日期只做一件事——选中那天并让它出现，不再滚动跳转', '★作业打卡 + 每日评价默认只看「昨天 / 今天 / 明天」三天：更早或更晚的作业、评价不再一股脑铺开；想看哪天，点上方日期条的那个日期，它才出现（再点一次收起）。列表更短、首屏更清爽', '逾期作业仍始终置顶在「⚠️ 逾期未完成」，不受「只看三天」影响；未设日期的作业单独成组', '左右翻周（‹ ›）保留，用来把日期条翻到任意过去/未来周去点选其他天'] },
       { version: '1.0.51', date: '2026-09-05', items: ['★作业打卡的周翻页日期条上移到「每日评价」上方：两个区块现在共用同一条 ‹上一周 / 下一周› 翻页器，翻一周同时切换作业与每日评价，不再各带一条、互相打架', '每日评价改成「按周 7 天」列表（之前只显示今天）：点某天展开「态度 / 方法 / 努力」三星评分并保存，今天和过去的日子都能补录，未来的日子置灰不可评——回看「哪天状态好、哪天不在状态」一目了然', '每日评价每行直接显示当天三项的迷你星 + 总分（满分 15），已评打绿标、未到打灰标，不用点开就知道这一周的整体走势', '作业日期条的副标题点明「作业 · 点日期看当天」，避免和上方每日评价混淆'] },
       { version: '1.0.50', date: '2026-09-04', items: ['★课次操作留痕：辅导课包里标记「已上课 / 请假 / 取消 / 调课 / 补课 / 撤销」时，现在会记下是谁、在几点几分做的，时间精确到分钟。课次列表每行底部直接显示最近一次操作（如「🕐 9/4 23:37 妈妈 标记已上课」），点进课次详情还能展开完整历史，每条标注状态迁移（如「待上课 → 已上课」）', '孩子误记、家长改回这类来回操作不再无迹可寻——历史按时间倒序排列，一眼看清这节课的处置过程', '历史每节课最多留 10 条，避免整份数据文件被操作记录无限撑大导致同步变慢；老课次没有历史时不显示、不报错'] },
       { version: '1.0.49', date: '2026-09-04', items: ['★作业按「布置日」归到那一天：以前是按截止日分组——周一布置、周五交的作业会显示在周五，想回看「那天老师布置了什么」根本找不到。现在布置在哪天就显示在哪天，翻到那一周即可看到当天布置的作业', '已完成作业也改为按布置日归组（原来按打卡日），回看历史时「那天布置的作业」是完整的，不会因后来才打卡而漂移到别的日子', '日期条徽标同步改为按布置日统计：蓝=当天布置的待完成数、绿=全部完成；逾期作业仍统一置顶在「⚠️ 逾期未完成」，不再重复计入当天——否则会出现「日期条显示 2 项、点进去只有 1 项」的数字对不上', '分组标题改为「今天布置 / 昨天布置 / 周三 8月20日布置」，副标题显示「N 项 · 待完成 M」；作业卡片上仍保留 ⏰ 截止时间与「已逾期」标记，什么时候交没丢', '老数据兼容：早期建的作业若没填布置日，自动退回按截止日归组，不会消失'] },
@@ -2871,18 +2872,31 @@ function hwDayKey(x) {
   return x.assignDate || x.dueDate || '';
 }
 
-/** 把作业切成有序分组（基于当前显示的周，按布置日归到那一天）。返回 { defs, hiddenN, pendN } */
+/** 相对今天偏移 n 天的日期（n 负=过去，正=未来） */
+function dayOffset(n) {
+  const d = new Date(today() + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return ymd(d);
+}
+/** 默认显示的天：昨天 / 今天 / 明天；若用户点了其他日期（HW_PICK），那一并出现。点日期不再跳转，只控制显隐 */
+function hwDisplayDays() {
+  const near = [dayOffset(-1), dayOffset(0), dayOffset(1)];
+  if (HW_PICK && !near.includes(HW_PICK)) near.push(HW_PICK);
+  return near;
+}
+
+/** 把作业切成有序分组（默认按昨天/今天/明天归组；点了其他日期那一并出现）。返回 { defs, hiddenN, pendN } */
 function hwGroupDefs(hws) {
-  const week = hwWeekDays();
-  const inWeek = new Set(week);
+  const disp = hwDisplayDays();
+  const inSet = new Set(disp);
   const ov = [], day = {}, nod = [];
 
   (hws || []).forEach(x => {
     const k = hwDayKey(x);
     if (!k) { nod.push(x); return; }                 // 布置日、截止日都没填
     if (hwOverdue(x)) { ov.push(x); return; }        // 先判逾期：已过截止时间的置顶提醒，不重复进当天组
-    if (inWeek.has(k)) (day[k] = day[k] || []).push(x);
-    // 其余：布置日不在本周，翻到对应的那一周才显示
+    if (inSet.has(k)) (day[k] = day[k] || []).push(x);
+    // 其余：不在默认三天、也不是当前选中日期 → 点日期条那天后才出现
   });
 
   const byKind = (a, b) => {
@@ -2903,7 +2917,7 @@ function hwGroupDefs(hws) {
       items: ov.slice().sort(byKind)
     });
   }
-  week.forEach(d => {
+  disp.forEach(d => {
     const items = day[d] || [];
     if (!items.length) return;                  // 当天没布置作业就不堆空组
     const rd = relDays(d);
@@ -3002,18 +3016,10 @@ function hwToggleGroup(key) {
   el.classList.toggle('open', open);
 }
 
-/** 点日期条：高亮当天 + 展开对应分组并平滑滚动过去（只用 scrollTo，避免 scrollIntoView 带动整页跳动） */
+/** 点日期条：仅选中该天并让它的作业分组 + 每日评价出现，不滚动跳转（避免一点日期就蹦到打卡区） */
 function hwPickDay(d) {
-  HW_PICK = d;
-  const bar = document.getElementById('hwBar');
-  if (bar) bar.querySelectorAll('.hw-day').forEach(el => el.classList.toggle('on', el.getAttribute('data-d') === d));
-  const keyD = 'd:' + d, keyC = 'c:' + d;
-  let el = document.getElementById(hwGid(keyD)), key = keyD;
-  if (!el) { el = document.getElementById(hwGid(keyC)); key = keyC; }
-  if (!el) { toast('这天没有作业安排'); return; }
-  if (!el.classList.contains('open')) { HW_OPEN[key] = true; el.classList.add('open'); }
-  const top = el.getBoundingClientRect().top + (window.pageYOffset || document.documentElement.scrollTop || 0) - 68;
-  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  HW_PICK = (HW_PICK === d) ? '' : d;   // 再点一次取消选中
+  renderToday();
 }
 
 /** 作业日期条按周翻页：上一周 / 下一周 / 回到本周（清空选择，让「今天」高亮） */
@@ -3280,9 +3286,8 @@ function hwForm(id, preset) {
 let DR_OPEN = null;
 
 function renderDailyRating() {
-  const week = hwWeekDays();
+  const week = hwDisplayDays();
   const t = today();
-  const lab = hwWeekLabel();
   const openD = DR_OPEN === null ? t : (DR_OPEN || '');
   const mini = (n) => { let s = ''; for (let i = 1; i <= 5; i++) s += `<span class="st ${i <= n ? 'on' : ''}">${i <= n ? '★' : '☆'}</span>`; return s; };
   const rows = week.map(d => {
@@ -3314,7 +3319,7 @@ function renderDailyRating() {
     return `<div class="dr-day">${hd}${editor}</div>`;
   }).join('');
   return `<div class="daily-sec">
-    <div class="daily-head">📅 每日评价 <small>${lab.rel} · 点某天打分，今天和过去可补录</small></div>
+    <div class="daily-head">📅 每日评价 <small>默认显示昨天/今天/明天 · 点上方日期看其他天</small></div>
     ${rows}
   </div>`;
 }
