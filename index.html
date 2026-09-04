@@ -220,6 +220,24 @@ img{max-width:100%;display:block}
 .daily-head small{display:block;margin-top:3px;font-weight:400;color:var(--mu);font-size:11.5px}
 .daily-sec .rate-edit{margin-bottom:10px}
 .daily-sec #drSave{width:100%}
+/* 每日评价：按周 7 天列表（与作业共用工况翻页） */
+.dr-day{border-top:1px solid var(--bd)}
+.dr-day:first-of-type{border-top:none}
+.dr-hd{display:flex;align-items:center;gap:8px;padding:9px 2px;cursor:pointer}
+.dr-hd.future{cursor:default;opacity:.62}
+.dr-hd.today .dr-d{color:var(--main);font-weight:800}
+.dr-d{flex:0 0 auto;min-width:62px;font-size:13.5px;font-weight:700;color:var(--tx1)}
+.dr-mini{flex:1;min-width:0;display:flex;align-items:center;gap:3px;font-size:10px;color:var(--mu);overflow:hidden}
+.dr-mini i{flex:0 0 auto;font-style:normal}
+.dr-mini .st-stars{flex:0 0 auto;font-size:10.5px;letter-spacing:0;margin-right:3px}
+.dr-total{flex:0 0 auto;font-size:15px;font-weight:800;color:var(--tx1)}
+.dr-total small{font-size:10px;font-weight:600;color:var(--mu)}
+.dr-total.zero{color:var(--bd)}
+.dr-tag{flex:0 0 auto;font-size:10.5px;font-weight:700;color:var(--mu);background:#F0F3F9;border-radius:8px;padding:2px 7px;white-space:nowrap}
+.dr-tag.done{color:var(--ok);background:rgba(37,198,133,.12)}
+.dr-ar{flex:0 0 auto;color:var(--mu);font-size:12px;width:14px;text-align:center}
+.dr-edit{background:#F7F9FE;border-radius:12px;padding:10px 12px;margin:0 2px 10px}
+.dr-edit .rate-tip{white-space:normal}
 .tt-before{padding:14px 16px;margin-bottom:12px;background:linear-gradient(120deg,#FFF3F7,#EEF3FF);border:1px dashed rgba(110,155,255,.5);border-radius:14px;color:var(--tx2);font-size:13.5px;text-align:center;line-height:1.6}
 
 /* 4 维星级评分 */
@@ -675,9 +693,9 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.50';
+const APP_VERSION = '1.0.51';
 const BUILD_NO = '20260904b';
-const BUILD_TIME = '2026-08-30';
+const BUILD_TIME = '2026-09-05';
 const HOUSEHOLD_ID = 'default';
 
 /* 默认节次表：新年级 / 新年级默认学期的作息模板（各学期可单独覆盖 periods / extendPeriods） */
@@ -1076,6 +1094,7 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.51', date: '2026-09-05', items: ['★作业打卡的周翻页日期条上移到「每日评价」上方：两个区块现在共用同一条 ‹上一周 / 下一周› 翻页器，翻一周同时切换作业与每日评价，不再各带一条、互相打架', '每日评价改成「按周 7 天」列表（之前只显示今天）：点某天展开「态度 / 方法 / 努力」三星评分并保存，今天和过去的日子都能补录，未来的日子置灰不可评——回看「哪天状态好、哪天不在状态」一目了然', '每日评价每行直接显示当天三项的迷你星 + 总分（满分 15），已评打绿标、未到打灰标，不用点开就知道这一周的整体走势', '作业日期条的副标题点明「作业 · 点日期看当天」，避免和上方每日评价混淆'] },
       { version: '1.0.50', date: '2026-09-04', items: ['★课次操作留痕：辅导课包里标记「已上课 / 请假 / 取消 / 调课 / 补课 / 撤销」时，现在会记下是谁、在几点几分做的，时间精确到分钟。课次列表每行底部直接显示最近一次操作（如「🕐 9/4 23:37 妈妈 标记已上课」），点进课次详情还能展开完整历史，每条标注状态迁移（如「待上课 → 已上课」）', '孩子误记、家长改回这类来回操作不再无迹可寻——历史按时间倒序排列，一眼看清这节课的处置过程', '历史每节课最多留 10 条，避免整份数据文件被操作记录无限撑大导致同步变慢；老课次没有历史时不显示、不报错'] },
       { version: '1.0.49', date: '2026-09-04', items: ['★作业按「布置日」归到那一天：以前是按截止日分组——周一布置、周五交的作业会显示在周五，想回看「那天老师布置了什么」根本找不到。现在布置在哪天就显示在哪天，翻到那一周即可看到当天布置的作业', '已完成作业也改为按布置日归组（原来按打卡日），回看历史时「那天布置的作业」是完整的，不会因后来才打卡而漂移到别的日子', '日期条徽标同步改为按布置日统计：蓝=当天布置的待完成数、绿=全部完成；逾期作业仍统一置顶在「⚠️ 逾期未完成」，不再重复计入当天——否则会出现「日期条显示 2 项、点进去只有 1 项」的数字对不上', '分组标题改为「今天布置 / 昨天布置 / 周三 8月20日布置」，副标题显示「N 项 · 待完成 M」；作业卡片上仍保留 ⏰ 截止时间与「已逾期」标记，什么时候交没丢', '老数据兼容：早期建的作业若没填布置日，自动退回按截止日归组，不会消失'] },
       { version: '1.0.48', date: '2026-09-02', items: ['★课表补上「下课时间」：以前周视图只在左侧节次号栏写了上课时间（08:20），看不到几点下课。现在左栏两行显示「08:20 / ↓09:00」，下课时间带 ↓ 且颜色淡一档，一眼分清几点上、几点下；延时服务同样处理', '课外辅导格子改为自包含完整区间「18:00-19:00」——它没有节次号栏可以对照，时间必须写在格子里（没填结束时间的仍只显示开始时间，可在课程编辑里补填）', '课程格子保持清爽：正课/延时只显示课程名与老师地点，时间统一看左栏，不重复占位；左侧列宽 26px→30px，给「↓09:00」留出余量', '注：列表视图、课程详情、今日页「下节课」原本就有完整起止时间，本次只补周视图'] },
@@ -1950,8 +1969,8 @@ function dailyRatingFor(date) {
   const d = date || ymd(new Date());
   return (S.data.dailyRatings || []).find(r => r.date === d) || null;
 }
-async function saveDailyRating(att, meth, eff) {
-  const d = ymd(new Date());
+async function saveDailyRating(date, att, meth, eff) {
+  const d = date || ymd(new Date());
   const grade = (S.data && S.data.grades) ? (S.data.grades.find(g => g.current) || S.data.grades[0]) : null;
   const gradeId = grade ? grade.id : '';
   const by = S.who || '';
@@ -2941,7 +2960,7 @@ function hwDateBarHTML(hws) {
   const isCur = !HW_WEEK_MON || HW_WEEK_MON === mondayOf(today());
   const nav = `<div class="hw-weekbar">
       <button class="wb-arrow" onclick="hwPrevWeek()" aria-label="上一周">‹</button>
-      <div class="wb-mid"><span class="wb-lab">${lab.range}</span><span class="wb-sub">${lab.rel} · 点日期看当天</span></div>
+      <div class="wb-mid"><span class="wb-lab">${lab.range}</span><span class="wb-sub">${lab.rel} · 作业 · 点日期看当天</span></div>
       <button class="wb-arrow" onclick="hwNextWeek()" aria-label="下一周">›</button>
       ${isCur ? '' : `<button class="wb-today" onclick="hwGoToday()" aria-label="回到今天">今</button>`}
     </div>`;
@@ -2971,8 +2990,7 @@ function hwSectionHTML(hws) {
   G.defs.forEach(g => { alive[g.key] = 1; });
   Object.keys(HW_OPEN).forEach(k => { if (!alive[k]) delete HW_OPEN[k]; });
 
-  let h = hwDateBarHTML(hws);
-  h += G.defs.map(g => hwGroupHTML(g)).join('');
+  let h = G.defs.map(g => hwGroupHTML(g)).join('');
   return h;
 }
 
@@ -3041,10 +3059,13 @@ function renderToday() {
       <div class="next-ic">🎉</div><div class="grow"><b>今天的课全部上完啦</b><p>记得完成作业打卡哦～</p></div></div>`;
   }
 
-  // 每日评价（态度/方法/努力，每天一次）
+  // 共享周翻页日期条：移到每日评价上方，作业与每日评价共用工况翻页
+  h += hwDateBarHTML(hws);
+
+  // 每日评价（按周 7 天，点某天打分，与作业共用工况翻页）
   h += renderDailyRating();
 
-  // 作业：按周翻页日期条 + 按日期分组（本周每天 / 逾期 / 未设截止日，可翻到任意过去或未来周）
+  // 作业：按布置日分组（日期条已上移到每日评价上方，共用周翻页）
   const pend = hws.filter(x => x.status !== 'done').length;
   h += `<div class="sec-h"><div class="sec-t">📝 作业打卡 <small>${pend} 项待完成</small></div>
     ${canEdit('homework') ? `<button class="btn xs" onclick="hwForm()">+ 记作业</button>` : ''}</div>`;
@@ -3254,27 +3275,65 @@ function hwForm(id, preset) {
 }
 
 /* ---------- 每日评价（态度/方法/努力，每天一次）---------- */
+/* 每日评价周视图：与作业打卡共用 HW_WEEK_MON 周翻页器，点某天展开三星评分。
+ * DR_OPEN：null=默认展开今天；''=用户收起；'YYYY-MM-DD'=展开该天 */
+let DR_OPEN = null;
+
 function renderDailyRating() {
-  const d = ymd(new Date());
-  const dr = dailyRatingFor(d);
-  const row = (name, lab, tip) => `<div class="rate-line"><span class="rate-lab">${lab}</span>${starInput('dr_' + name, dr ? dr[name] : 0)}</div>
-      ${tip ? `<p class="rate-tip">${tip}</p>` : ''}`;
+  const week = hwWeekDays();
+  const t = today();
+  const lab = hwWeekLabel();
+  const openD = DR_OPEN === null ? t : (DR_OPEN || '');
+  const mini = (n) => { let s = ''; for (let i = 1; i <= 5; i++) s += `<span class="st ${i <= n ? 'on' : ''}">${i <= n ? '★' : '☆'}</span>`; return s; };
+  const rows = week.map(d => {
+    const rd = relDays(d);
+    const dr = dailyRatingFor(d);
+    const att = dr ? dr.att : 0, meth = dr ? dr.meth : 0, eff = dr ? dr.eff : 0;
+    const total = att + meth + eff;
+    const isT = d === t;
+    const future = rd > 0;
+    const editable = !future;
+    const dt = new Date(d + 'T00:00:00');
+    const label = rd === 0 ? '今天' : rd === 1 ? '明天' : rd === -1 ? '昨天'
+      : rd === 2 ? '后天' : rd === -2 ? '前天'
+        : WD[dt.getDay()] + ' ' + (dt.getMonth() + 1) + '/' + dt.getDate();
+    const open = openD === d && editable;
+    const hd = `<div class="dr-hd ${isT ? 'today' : ''} ${future ? 'future' : ''} ${open ? 'open' : ''}" ${editable ? `onclick="drToggle('${d}')"` : ''}>
+        <span class="dr-d">${label}</span>
+        <span class="dr-mini"><i>态</i><b class="st-stars ro">${mini(att)}</b><i>法</i><b class="st-stars ro">${mini(meth)}</b><i>力</i><b class="st-stars ro">${mini(eff)}</b></span>
+        <span class="dr-total ${total ? '' : 'zero'}">${total}<small>/15</small></span>
+        <span class="dr-tag ${dr ? 'done' : ''}">${dr ? '已评' : (future ? '未到' : '未评')}</span>
+        <span class="dr-ar">${editable ? (open ? '▾' : '▸') : ''}</span>
+      </div>`;
+    const editor = open ? `<div class="dr-edit">
+        ${drLine('att', '态度', '主动进入学习状态：不用催、不拖延，坐得住、先自己思考', att)}
+        ${drLine('meth', '方法', '用对方法：先复习再做题，错题会归因，不盲目刷题', meth)}
+        ${drLine('eff', '努力', '投入程度：专注时长够，遇到难题愿意多坚持一会儿', eff)}
+        <button class="btn sm ok" id="drSave" onclick="saveDailyRatingClick()">${dr ? '更新' + label + '评价' : '保存' + label + '评价'}</button>
+      </div>` : '';
+    return `<div class="dr-day">${hd}${editor}</div>`;
+  }).join('');
   return `<div class="daily-sec">
-    <div class="daily-head">📅 每日评价 <small>${fmtDate(d)} · 态度 / 方法 / 努力，每天一次</small></div>
-    <div class="rate-edit">
-      ${row('att', '态度', '主动进入学习状态：不用催、不拖延，坐得住、先自己思考')}
-      ${row('meth', '方法', '用对方法：先复习再做题，错题会归因，不盲目刷题')}
-      ${row('eff', '努力', '投入程度：专注时长够，遇到难题愿意多坚持一会儿')}
-    </div>
-    <button class="btn sm ok" id="drSave" onclick="saveDailyRatingClick()">${dr ? '更新今日评价' : '保存今日评价'}</button>
+    <div class="daily-head">📅 每日评价 <small>${lab.rel} · 点某天打分，今天和过去可补录</small></div>
+    ${rows}
   </div>`;
 }
+function drLine(name, lab, tip, val) {
+  return `<div class="rate-line"><span class="rate-lab">${lab}</span>${starInput('dr_' + name, val)}</div>
+    ${tip ? `<p class="rate-tip">${tip}</p>` : ''}`;
+}
+function drToggle(d) {
+  const cur = DR_OPEN === null ? today() : (DR_OPEN || '');
+  DR_OPEN = (cur === d) ? '' : d;
+  renderToday();
+}
 async function saveDailyRatingClick() {
+  const d = DR_OPEN === null ? today() : (DR_OPEN || today());
   const att = numVal('stv_dr_att', 0), meth = numVal('stv_dr_meth', 0), eff = numVal('stv_dr_eff', 0);
   try {
-    await saveDailyRating(att, meth, eff);
+    await saveDailyRating(d, att, meth, eff);
     await refresh();
-    toast('今日评价已保存 🌟');
+    toast(`${fmtDate(d)} 评价已保存 🌟`);
   } catch (e) { toast(e.message); }
 }
 
