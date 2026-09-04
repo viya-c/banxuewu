@@ -192,6 +192,9 @@ img{max-width:100%;display:block}
 .tt-rn.ext{background:var(--ext-bg);color:var(--ext)}
 .tt-rn.tut{background:var(--tut-bg);color:var(--tut)}
 .tt-rn.am i,.tt-rn.pm i,.tt-rn.ext i,.tt-rn.tut i{color:inherit;opacity:.62}
+/* 下课时间：排在上课时间下面一行，比上课时间淡一档，一眼分清「几点上 / 几点下」 */
+.tt-rn i.en{opacity:.55}
+.tt-rn.am i.en,.tt-rn.pm i.en,.tt-rn.ext i.en,.tt-rn.tut i.en{opacity:.48}
 .legend{display:flex;gap:12px;justify-content:center;margin-top:11px;font-size:11.5px;color:var(--tx2);flex-wrap:wrap}
 .legend i{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:-1px}
 
@@ -672,8 +675,8 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.47';
-const BUILD_NO = '20260902a';
+const APP_VERSION = '1.0.50';
+const BUILD_NO = '20260904b';
 const BUILD_TIME = '2026-08-30';
 const HOUSEHOLD_ID = 'default';
 
@@ -1073,6 +1076,9 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.50', date: '2026-09-04', items: ['★课次操作留痕：辅导课包里标记「已上课 / 请假 / 取消 / 调课 / 补课 / 撤销」时，现在会记下是谁、在几点几分做的，时间精确到分钟。课次列表每行底部直接显示最近一次操作（如「🕐 9/4 23:37 妈妈 标记已上课」），点进课次详情还能展开完整历史，每条标注状态迁移（如「待上课 → 已上课」）', '孩子误记、家长改回这类来回操作不再无迹可寻——历史按时间倒序排列，一眼看清这节课的处置过程', '历史每节课最多留 10 条，避免整份数据文件被操作记录无限撑大导致同步变慢；老课次没有历史时不显示、不报错'] },
+      { version: '1.0.49', date: '2026-09-04', items: ['★作业按「布置日」归到那一天：以前是按截止日分组——周一布置、周五交的作业会显示在周五，想回看「那天老师布置了什么」根本找不到。现在布置在哪天就显示在哪天，翻到那一周即可看到当天布置的作业', '已完成作业也改为按布置日归组（原来按打卡日），回看历史时「那天布置的作业」是完整的，不会因后来才打卡而漂移到别的日子', '日期条徽标同步改为按布置日统计：蓝=当天布置的待完成数、绿=全部完成；逾期作业仍统一置顶在「⚠️ 逾期未完成」，不再重复计入当天——否则会出现「日期条显示 2 项、点进去只有 1 项」的数字对不上', '分组标题改为「今天布置 / 昨天布置 / 周三 8月20日布置」，副标题显示「N 项 · 待完成 M」；作业卡片上仍保留 ⏰ 截止时间与「已逾期」标记，什么时候交没丢', '老数据兼容：早期建的作业若没填布置日，自动退回按截止日归组，不会消失'] },
+      { version: '1.0.48', date: '2026-09-02', items: ['★课表补上「下课时间」：以前周视图只在左侧节次号栏写了上课时间（08:20），看不到几点下课。现在左栏两行显示「08:20 / ↓09:00」，下课时间带 ↓ 且颜色淡一档，一眼分清几点上、几点下；延时服务同样处理', '课外辅导格子改为自包含完整区间「18:00-19:00」——它没有节次号栏可以对照，时间必须写在格子里（没填结束时间的仍只显示开始时间，可在课程编辑里补填）', '课程格子保持清爽：正课/延时只显示课程名与老师地点，时间统一看左栏，不重复占位；左侧列宽 26px→30px，给「↓09:00」留出余量', '注：列表视图、课程详情、今日页「下节课」原本就有完整起止时间，本次只补周视图'] },
       { version: '1.0.47', date: '2026-09-02', items: ['★折叠不再误伤主功能：此前「所有分区一律默认折叠」把作业打卡的周翻页条、日期条一起藏了进去——你得先展开才能翻页，可一点翻页页面重渲染、又被折回去，看起来就像「点翻页触发了折叠」。现在只有标了折叠标记的辅助/设置区块（课表工具、提醒设置、数据与安全、更新日志、家庭成员、年级分区、积分使用、已过期/已结课、操作）默认收起；作业打卡、在读课包、成绩记录、作业记录、作息正课/延时课这类数据主体一律常驻，翻页和列表随时可用', '★折叠状态会记住：以前展开一个区块后，只要页面重渲染（翻周、改数据、切页面、刷新）就被打回默认折叠。现在展开/收起的选择按区块记在本地，重渲染和刷新后都按你的选择来；没动过的区块仍走默认收起', '折叠箭头紧跟标题右侧（标题留在左），右侧操作按钮（如「+ 加一节」）独立贴最右，三者不再互相挤压'] },
       { version: '1.0.46', date: '2026-09-01', items: ['★作业打卡日期条改为「按周翻页」：顶部加 ‹ 上一周 / 下一周 › 翻页器，可一路翻到任意过去或未来的周，点「今天」按钮回到本周；不再受原来 14 天窗口限制，更早以前的作业也能看到', '每周显示周一到周日 7 天，每天带未完成/已完成数量徽标；点某天直达当天组', '逾期作业（含今天已过点）始终置顶在「⚠️ 逾期未完成」组，翻到任意周都看得到，不会被埋进当天组；已完成作业按打卡周显示，翻到对应周才出现'] },
       { version: '1.0.45', date: '2026-09-01', items: ['★全模块分区折叠：每个功能区块（课表工具 / 作息设置 / 提醒设置 / 数据备份 / 更新日志…）标题现在可点，默认收起，点标题展开看内容——页面不再一拉到底，首屏更清爽；课程主视图、作业列表这类核心内容保持常驻', '更新日志只显示最近 3 条，点「查看全部 N 条」展开完整历史', '折叠头用内联 SVG 箭头（收起时朝下、展开时朝右），不是 emoji'] },
@@ -1265,6 +1271,7 @@ function reconcile(DB) {
       const pkg = state.packages.find(p => p.id === seg[1]); if (!pkg) return { ok: false, error: '课包不存在' };
       const s = pkg.sessions.find(x => x.id === seg[3]); if (!s) return { ok: false, error: '课次不存在' };
       const act = body.action;
+      const oldStatus = s.status;
       if (act === 'attend') { s.status = 'at'; if (body.note !== undefined) s.note = body.note; }
       else if (act === 'leave') { s.status = 'lv'; if (body.note !== undefined) s.note = body.note; }
       else if (act === 'cancel') { s.status = 'no'; }
@@ -1283,7 +1290,13 @@ function reconcile(DB) {
         s.status = 'lv'; s.note = (s.note ? s.note + '；' : '') + '已安排补课';
       }
       else return { ok: false, error: '未知动作' };
-      s.updatedAt = new Date().toISOString(); await commit(); return ok({ ...pkg, stats: packageStats(pkg) });
+      // 操作留痕：记下「谁在什么时候把状态从什么改成了什么」，时间精确到分钟。
+      // 只保留最近 10 条，避免整份数据文件被历史无限撑大（写入 GitHub 会越来越慢）
+      const nowIso = new Date().toISOString();
+      if (!Array.isArray(s.acts)) s.acts = [];
+      s.acts.push({ at: nowIso, by: body.by || '', act, from: oldStatus, to: s.status });
+      if (s.acts.length > 10) s.acts = s.acts.slice(-10);
+      s.actAt = nowIso; s.actBy = body.by || ''; s.updatedAt = nowIso; await commit(); return ok({ ...pkg, stats: packageStats(pkg) });
     }
     if (seg[0] === 'packages' && seg[2] === 'sessions') {
       const pkg = state.packages.find(p => p.id === seg[1]); if (!pkg) return { ok: false, error: '课包不存在' };
@@ -2204,7 +2217,8 @@ function ttWeekHTML(list) {
   const parity = weekParityAtOffset(off);
   const vis = list.filter(c => !parity || !c.weekType || c.weekType === 'all' || c.weekType === parity);
 
-  const colStyle = `grid-template-columns:26px repeat(${days.length},1fr)`;
+  // 第一列要放下「节次号 + 08:20 + ↓09:00」，26px 太紧（8px 字号下 ↓09:00 约 25px），放宽到 30px
+  const colStyle = `grid-template-columns:30px repeat(${days.length},1fr)`;
   let h = `<div class="tt-wrap"><div class="tt ${off === 0 ? 'is-curweek' : ''}" style="${colStyle}">`;
 
   // 表头（按当前查看周的真实日期，今天高亮）
@@ -2237,7 +2251,7 @@ function ttWeekHTML(list) {
       curZone = z;
       h += `<div class="tt-sep ${z}">${z === 'am' ? '☀️ 上午' : '🌤 下午'}</div>`;
     }
-    h += `<div class="tt-rn ${z}">${i + 1}<i>${p ? p.start : ''}</i></div>`;
+    h += `<div class="tt-rn ${z}">${i + 1}<i>${p ? p.start : ''}</i>${p && p.end ? `<i class="en">↓${p.end}</i>` : ''}</div>`;
     days.forEach(d => { h += cellHTML(vis, d, 'main', i, off); });
   }
 
@@ -2246,7 +2260,7 @@ function ttWeekHTML(list) {
     h += `<div class="tt-sep ext">🌇 延时服务</div>`;
     for (let i = 0; i < maxExt; i++) {
       const p = ttExt[i];
-      h += `<div class="tt-rn ext">延${i + 1}<i>${p ? p.start : ''}</i></div>`;
+      h += `<div class="tt-rn ext">延${i + 1}<i>${p ? p.start : ''}</i>${p && p.end ? `<i class="en">↓${p.end}</i>` : ''}</div>`;
       days.forEach(d => { h += cellHTML(vis, d, 'extend', i, off); });
     }
   }
@@ -2267,8 +2281,10 @@ function ttWeekHTML(list) {
         const pk = c.packageId ? S.data.packages.find(p => p.id === c.packageId) : null;
         const sub = pk && pk.org ? ` <small style="color:var(--mu)">· ${esc(pk.org)}</small>` : '';
         const title = pk ? pk.name : courseTitle(c);   // 关联课包时优先显示课包名称（而非图标/科目）
+        // 课外辅导没有节次号栏可对照，时间必须自包含；没填结束时间就只显示开始时间
+        const timeTx = t.start ? (t.end ? t.start + '-' + t.end : t.start) : '';
         return `<div class="tt-cell t-tutor ${hasHW(c) ? 'hw-dot' : ''} ${isToday ? 'is-today' : ''}" onclick="courseDetail('${c.id}','${dayISO[d]}')">${isToday ? '<span class="ic-today"></span>' : ''}
-          ${esc(title)}${sub}<small>${esc(t.start || '')}</small>${linkSessionPill(c.packageId, dayISO[d])}</div>`;
+          ${esc(title)}${sub}${timeTx ? `<small>${esc(timeTx)}</small>` : ''}${linkSessionPill(c.packageId, dayISO[d])}</div>`;
       }).join('') + offTemplateSessionChips(dayISO[d]) + `</div>`;
     }
   });
@@ -2831,24 +2847,23 @@ function hwGroupOpen(g) {
   return !!g.defOpen;
 }
 
-/** 把作业切成有序分组（基于当前显示的周，不再有 14 天窗口）。返回 { defs, hiddenN, pendN } */
+/** 作业应归到哪一天：以「布置日」为准（哪天布置就显示在哪天）；老数据没记布置日时退回截止日 */
+function hwDayKey(x) {
+  return x.assignDate || x.dueDate || '';
+}
+
+/** 把作业切成有序分组（基于当前显示的周，按布置日归到那一天）。返回 { defs, hiddenN, pendN } */
 function hwGroupDefs(hws) {
   const week = hwWeekDays();
   const inWeek = new Set(week);
-  const t = today();
   const ov = [], day = {}, nod = [];
 
   (hws || []).forEach(x => {
-    if (x.status === 'done') {
-      // 已完成：只在打卡日落在当前显示周时归入当天组；翻到那周才看得到
-      const k = (x.checkinAt || '').slice(0, 10);
-      if (k && inWeek.has(k)) (day[k] = day[k] || []).push(x);
-      return;
-    }
-    if (!x.dueDate) { nod.push(x); return; }
-    if (hwOverdue(x)) { ov.push(x); return; }   // 先判逾期：任何已逾期（含今天已过点）都置顶提醒，不被埋进当天组
-    if (inWeek.has(x.dueDate)) { (day[x.dueDate] = day[x.dueDate] || []).push(x); return; }
-    // 其余：未到本周的将来作业，翻到那周才显示
+    const k = hwDayKey(x);
+    if (!k) { nod.push(x); return; }                 // 布置日、截止日都没填
+    if (hwOverdue(x)) { ov.push(x); return; }        // 先判逾期：已过截止时间的置顶提醒，不重复进当天组
+    if (inWeek.has(k)) (day[k] = day[k] || []).push(x);
+    // 其余：布置日不在本周，翻到对应的那一周才显示
   });
 
   const byKind = (a, b) => {
@@ -2871,20 +2886,21 @@ function hwGroupDefs(hws) {
   }
   week.forEach(d => {
     const items = day[d] || [];
-    if (!items.length) return;                  // 当天没作业就不堆空组
+    if (!items.length) return;                  // 当天没布置作业就不堆空组
     const rd = relDays(d);
-    pendN += items.filter(x => x.status !== 'done').length;
-    const icon = rd === 0 ? '📌' : rd === 1 ? '🌅' : rd === -1 ? '🌙' : '🗓';
-    const tip = rd === 0 ? ' · 今天要做完' : rd === 1 ? ' · 提前了解' : rd === -1 ? ' · 昨天该做的' : rd < 0 ? ' · 已过去' : '';
+    const undone = items.filter(x => x.status !== 'done').length;
+    pendN += undone;
+    const icon = rd === 0 ? '📌' : rd === -1 ? '🌙' : rd === 1 ? '🌅' : '🗓';
     defs.push({
       key: 'd:' + d, tone: rd === 0 ? 'tdy' : '', defOpen: true,
-      title: `${icon} ${hwDayTitle(d)}`, sub: `${items.length} 项${tip}`,
+      title: `${icon} ${hwDayTitle(d)}布置`,
+      sub: `${items.length} 项${undone ? ` · 待完成 ${undone}` : ' · 全部完成'}`,
       items: items.slice().sort(byKind)
     });
   });
   if (nod.length) {
-    pendN += nod.length;
-    defs.push({ key: 'nod', tone: '', defOpen: false, title: '📋 未设截止日', sub: `${nod.length} 项`, items: nod });
+    pendN += nod.filter(x => x.status !== 'done').length;
+    defs.push({ key: 'nod', tone: '', defOpen: false, title: '📋 未设日期', sub: `${nod.length} 项 · 没填布置日也没填截止日`, items: nod });
   }
   return { defs, hiddenN: 0, pendN };
 }
@@ -2896,27 +2912,25 @@ function hwDateBarHTML(hws) {
   const inWeek = new Set(week);
   const pend = {}, done = {};
   (hws || []).forEach(x => {
-    if (x.status === 'done') {
-      const k = (x.checkinAt || '').slice(0, 10);
-      if (k && inWeek.has(k)) done[k] = (done[k] || 0) + 1;
-      return;
-    }
-    if (!x.dueDate) return;
-    if (!inWeek.has(x.dueDate)) return;
-    const p = (pend[x.dueDate] = pend[x.dueDate] || { n: 0, ov: 0 });
-    p.n++;
-    if (hwOverdue(x)) p.ov++;
+    // 与分组口径一致：按布置日统计；逾期的已进顶部置顶组，不重复计入当天
+    // （否则「日期条显示 2 项、点进去只有 1 项」，数字对不上）
+    const k = hwDayKey(x);
+    if (!k || !inWeek.has(k)) return;
+    if (x.status === 'done') { done[k] = (done[k] || 0) + 1; return; }
+    if (hwOverdue(x)) return;
+    pend[k] = (pend[k] || 0) + 1;
   });
   const chips = week.map(d => {
     const dt = new Date(d + 'T00:00:00');
-    const p = pend[d] || { n: 0, ov: 0 };
+    const pn = pend[d] || 0;
     const dn = done[d] || 0;
     const isT = d === t;
     const sel = HW_PICK ? HW_PICK === d : isT;
     const cls = ['hw-day'];
     if (isT) cls.push('today');
     if (sel) cls.push('on');
-    const badge = p.n ? `<span class="n${p.ov ? ' warn' : ''}">${p.n}</span>`
+    // 蓝=待完成数，绿=全部完成（显示已完成数），无作业则占位隐藏
+    const badge = pn ? `<span class="n">${pn}</span>`
       : dn ? `<span class="n" style="background:var(--ok)">${dn}</span>`
         : `<span class="n hide">0</span>`;
     return `<div class="${cls.join(' ')}" data-d="${d}" onclick="hwPickDay('${d}')">
@@ -3277,6 +3291,31 @@ const SESSION = {
   no: { t: '已取消', c: 'gy', e: '✕' }
 };
 const LEAVE_RULE = { keep: '请假不扣课时（可补课）', deduct: '请假即扣课时' };
+
+/* 课次操作留痕：动作 → 中文名（数据记在 session.acts 里，时间精确到分钟） */
+const SESS_ACT = {
+  attend: '标记已上课', leave: '标记请假', cancel: '取消课次',
+  undo: '改回待上课', reschedule: '调课', makeup: '安排补课', postpone: '顺延补课'
+};
+/** 最近一次操作，一行小字：🕐 9/4 23:37 妈妈标记已上课 */
+function sessActTx(s) {
+  const last = (s && Array.isArray(s.acts) && s.acts.length) ? s.acts[s.acts.length - 1] : null;
+  if (!last) return '';
+  const who = last.by ? esc(last.by) + ' ' : '';
+  return `<span class="muted" style="font-size:11px">🕐 ${fmtDateTime(last.at)} ${who}${SESS_ACT[last.act] || '更新状态'}</span>`;
+}
+/** 完整操作记录（课次详情里展开看），倒序：最近在上 */
+function sessActsHTML(s) {
+  const acts = (s && Array.isArray(s.acts)) ? s.acts : [];
+  if (!acts.length) return '';
+  const rows = acts.slice().reverse().map(a => `<div class="row" style="padding:6px 0;${a === acts[acts.length - 1] ? '' : 'border-bottom:1px solid var(--bd)'}">
+      <span class="muted" style="font-size:12px;flex:none">🕐 ${fmtDateTime(a.at)}</span>
+      <span class="grow" style="font-size:12.5px">${a.by ? esc(a.by) + ' · ' : ''}${SESS_ACT[a.act] || '更新状态'}</span>
+      <span class="tag gy" style="font-size:10.5px;flex:none">${(SESSION[a.from] || SESSION.sc).t} → ${(SESSION[a.to] || SESSION.sc).t}</span>
+    </div>`).join('');
+  return `<div class="sec-h" data-fold="pkg-sesslog"><div class="sec-t">🕐 操作记录 <small>${acts.length} 条 · 精确到分钟</small></div></div>
+    <div class="card">${rows}</div>`;
+}
 const sessPill = (s) => {
   if (s.rescheduled && s.status === 'sc') return `<span class="tag p">↪ 已调课${s.origDate ? ' 原' + fmtDate(s.origDate) : ''}</span>`;
   const m = SESSION[s.status] || SESSION.sc;
@@ -3460,6 +3499,7 @@ function renderSessMonths(p) {
         <div class="list-ic">${(SESSION[s.status] || SESSION.sc).e}</div>
         <div class="col grow"><b style="font-size:13.5px">${fmtDateFull(s.plannedDate)} <span class="muted" style="font-weight:500">${WD[Number(s.weekday)]} ${s.start || ''}-${s.end || ''}</span>${s.rescheduled && s.origDate ? ` <span class="muted">原 ${fmtDate(s.origDate)}</span>` : ''}</b>
         ${s.note ? `<span class="muted ell">${esc(s.note)}</span>` : `<span class="muted">${past && s.status === 'sc' ? '已过期未处理' : (s.status === 'sc' ? '待上课' : '')}</span>`}
+        ${sessActTx(s)}
         </div>
         <div class="col" style="align-items:flex-end;gap:4px">
           ${sessPill(s)}
@@ -3502,9 +3542,11 @@ function sessionActions(pkgId, sid) {
         ${sessPill(s)}
       </div>
       ${s.note ? `<p class="tx2" style="margin-top:8px">${esc(s.note)}</p>` : ''}
+      ${sessActTx(s) ? `<p style="margin-top:6px">${sessActTx(s)}</p>` : ''}
       ${s.rescheduled && s.origDate ? `<p class="muted" style="margin-top:6px">↪ 已从 <b>${fmtDate(s.origDate)} ${WD[new Date(s.origDate + 'T00:00:00').getDay()]}</b> 调至 <b>${fmtDate(s.plannedDate)} ${WD[Number(s.weekday)]}</b></p>` : (s.rescheduled ? `<p class="muted" style="margin-top:6px">↪ 该课次已调课</p>` : '')}
       ${lv && s.makeupOf ? `<p class="muted" style="margin-top:6px">已安排补课</p>` : ''}
     </div>
+    ${sessActsHTML(s)}
     <div class="sec-h" data-fold="pkg-actions"><div class="sec-t">操作</div></div>
     ${sessOpsHTML(p, s)}`;
   const foot = `<button class="btn ghost" onclick="pkgDetail('${pkgId}')">返回课包</button>`;
@@ -3567,7 +3609,7 @@ async function sessAction(pkgId, sid, action, extra = {}) {
   }
   const map = { attend: '已记录上课', leave: '已请假', cancel: '已取消', undo: '已改回待上课', postpone: '已安排顺延补课', makeup: '已安排补课', reschedule: '已调课' };
   try {
-    await api(`/packages/${pkgId}/sessions/${sid}/action`, { method: 'POST', body: { action, ...extra } });
+    await api(`/packages/${pkgId}/sessions/${sid}/action`, { method: 'POST', body: { action, by: S.who || '', ...extra } });
     await refresh();
     const np = S.data.packages.find(x => x.id === pkgId);
     pkgDetail(pkgId);
@@ -3590,7 +3632,7 @@ function rescheduleForm(pkgId, sid) {
       document.getElementById('rsSave').onclick = async () => {
         if (!val('rsDate')) return toast('请选择日期');
         try {
-          await api(`/packages/${pkgId}/sessions/${sid}/action`, { method: 'POST', body: { action: 'reschedule', date: val('rsDate'), start: val('rsStart'), end: val('rsEnd') } });
+          await api(`/packages/${pkgId}/sessions/${sid}/action`, { method: 'POST', body: { action: 'reschedule', by: S.who || '', date: val('rsDate'), start: val('rsStart'), end: val('rsEnd') } });
           await refresh(); pkgDetail(pkgId); toast('已调课 ↪');
         } catch (e) { toast(e.message); }
       };
@@ -3616,8 +3658,8 @@ function makeupForm(pkgId, sid) {
       document.getElementById('mkSave').onclick = async () => {
         const date = val('mkDate');
         try {
-          if (date) await api(`/packages/${pkgId}/sessions/${sid}/action`, { method: 'POST', body: { action: 'makeup', date, start: val('mkStart'), end: val('mkEnd') } });
-          else await api(`/packages/${pkgId}/sessions/${sid}/action`, { method: 'POST', body: { action: 'postpone' } });
+          if (date) await api(`/packages/${pkgId}/sessions/${sid}/action`, { method: 'POST', body: { action: 'makeup', by: S.who || '', date, start: val('mkStart'), end: val('mkEnd') } });
+          else await api(`/packages/${pkgId}/sessions/${sid}/action`, { method: 'POST', body: { action: 'postpone', by: S.who || '' } });
           await refresh(); pkgDetail(pkgId); toast('已安排补课 🔁');
         } catch (e) { toast(e.message); }
       };
@@ -3663,7 +3705,7 @@ async function quickConsume(pkgId) {
   const todayS = (p.sessions || []).find(s => s.status === 'sc' && s.plannedDate === today());
   try {
     if (todayS) {
-      await api(`/packages/${pkgId}/sessions/${todayS.id}/action`, { method: 'POST', body: { action: 'attend', note: '课表一键扣课时' } });
+      await api(`/packages/${pkgId}/sessions/${todayS.id}/action`, { method: 'POST', body: { action: 'attend', by: S.who || '', note: '课表一键扣课时' } });
     } else {
       // 没有今天的课次则临时建一条“已上课”记录
       const course = gCourses().find(c => c.packageId === pkgId);
