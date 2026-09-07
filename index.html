@@ -147,6 +147,9 @@ img{max-width:100%;display:block}
 .tag{font-size:11px;padding:2.5px 9px;border-radius:20px;font-weight:700;white-space:nowrap;display:inline-block}
 .tag.b{background:rgba(91,140,255,.13);color:var(--main)}
 .tag.o{background:rgba(255,159,67,.15);color:var(--yan-d)}
+.tag.tg-sameday{background:rgba(91,140,255,.13);color:var(--main)}
+.tag.tg-window{background:rgba(124,199,12,.16);color:#5a9e0d}
+.tag.tg-daily{background:rgba(255,122,158,.16);color:#e0567f}
 .tag.p{background:rgba(165,94,234,.13);color:var(--fu)}
 .tag.g{background:rgba(37,198,133,.14);color:var(--ok)}
 .tag.r{background:rgba(255,107,107,.13);color:var(--warn)}
@@ -675,7 +678,7 @@ window.__GITHUB = readGhCfg();
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.54';
+const APP_VERSION = '1.0.55';
 const BUILD_NO = '20260904b';
 const BUILD_TIME = '2026-09-05';
 const HOUSEHOLD_ID = 'default';
@@ -1040,7 +1043,9 @@ function seedDemo(DB, gradeId) {
   DB.homeworks = [
     mk({ type: 'school', subject: '语文', title: '生字抄写2遍 + 背诵古诗', dueDate: d(0), dueTime: '20:30', status: 'todo', courseId: null }),
     mk({ type: 'school', subject: '数学', title: '口算100题', dueDate: d(1), dueTime: '21:00', status: 'todo', courseId: null }),
-    mk({ type: 'extend', subject: '英语', title: '英语绘本阅读30分钟', dueDate: d(2), dueTime: '21:00', status: 'todo', courseId: null })
+    mk({ type: 'extend', subject: '英语', title: '英语绘本阅读30分钟', dueDate: d(2), dueTime: '21:00', status: 'todo', courseId: null }),
+    mk({ source: 'school', subject: '数学', title: '错题本整理（本周内）', assignDate: d(-1), dueDate: d(2), dueTime: '21:00', status: 'todo', courseId: null }),
+    mk({ repeat: 'daily', source: 'tutor', subject: '其他', title: '口算打卡 100 天', assignDate: d(-2), startDate: d(-2), endDate: d(97), dueTime: null, status: 'todo', doneDates: [d(-2), d(-1), d(0)], courseId: null })
   ];
   DB.exams = [
     mk({ subject: '数学', type: '单元测', name: '第三单元测试', date: d(5), score: null, full: 100 }),
@@ -1076,6 +1081,7 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.55', date: '2026-09-07', items: ['★作业支持三种完成方式：📌 当天完成 / 📅 几天内完成 / 🔁 每天重复（如 100 天打卡）。记作业时在「完成方式」里选，对应显示布置+截止 或 开始+结束日期', '★未完成的作业在「截止日前每天都显示」：以前只显示在布置那天，现在没做完的作业会从布置日一直挂到截止日，每天打卡区都能看到，不会写着写着就找不到了', '★每天重复类作业按天独立打卡：每天单独勾选完成，卡片显示「第 N / 共 M 天」进度，漏打的天可回头补；未来的日子不能提前打', '逾期作业仍始终置顶在「⚠️ 逾期未完成」，不受「每天显示」影响；老作业（没设完成方式）自动按「当天/几天内」兼容，不会消失'] },
       { version: '1.0.54', date: '2026-09-05', items: ['★修正：每日评价恢复「可左右翻选日期」，且默认仍只显示今天——上次误把翻页导航整个删了，这次改对：每日评价 = 当天一张紧凑评价卡 + 上方共享周翻页器', '★共享周翻页条重新放在每日评价上方：点日期条上的某天、或 ‹ › 翻周，作业与每日评价一起切换到那天（这正是最初「两个区块共用一条翻页器」的诉求），不再各带一条、互相打架', '每日评价点哪天就显示哪天的态度/方法/努力评分并可保存；未来的日子置灰不可评，今天和过去的日子都能补录回看', '作业打卡行为不变：默认昨天/今天/明天、点其他日期才出现、点日期不跳转'] },
       { version: '1.0.53', date: '2026-09-05', items: ['★每日评价回归「只显示今天」：上一版的按周 7 天 / 最近三天列表虽然能回看，但占地方。现在每日评价只保留今天这一张紧凑评价卡（态度 / 方法 / 努力三星 + 保存按钮），首屏更短、更聚焦', '★周翻页日期条移回作业区正上方：因为每日评价不再按周翻动，那条 ‹上一周 / 下一周› 翻页器现在专心服务作业打卡（选日期、看任意过去/未来周），不再挂在每日评价头上造成「这条翻页好像跟上面没关系」的错觉', '作业打卡仍维持「默认昨天/今天/明天、点其他日期才出现」的紧凑逻辑，本次只动每日评价，作业区行为不变'] },
       { version: '1.0.52', date: '2026-09-05', items: ['★点日期不再乱跳：之前点作业日期条上的某天，页面会「嗖」地滚到下方打卡分组，看着很晕。现在点日期只做一件事——选中那天并让它出现，不再滚动跳转', '★作业打卡 + 每日评价默认只看「昨天 / 今天 / 明天」三天：更早或更晚的作业、评价不再一股脑铺开；想看哪天，点上方日期条的那个日期，它才出现（再点一次收起）。列表更短、首屏更清爽', '逾期作业仍始终置顶在「⚠️ 逾期未完成」，不受「只看三天」影响；未设日期的作业单独成组', '左右翻周（‹ ›）保留，用来把日期条翻到任意过去/未来周去点选其他天'] },
@@ -1330,12 +1336,21 @@ function reconcile(DB) {
     // 作业打卡
     if (seg[0] === 'checkin' && method === 'POST' && seg[1]) {
       const hw = state.homeworks.find(h => h.id === seg[1]); if (!hw) return { ok: false, error: '作业不存在' };
+      if (hw.repeat === 'daily') {
+        // 每天重复：按天独立打卡，记在 doneDates，不做整条 done
+        hw.doneDates = Array.isArray(hw.doneDates) ? hw.doneDates : [];
+        const day = body.day || ymd(new Date());
+        if (body.cancel) hw.doneDates = hw.doneDates.filter(z => z !== day);
+        else if (!hw.doneDates.includes(day)) hw.doneDates.push(day);
+        hw.doneDates.sort();
+        await commit(); return ok(hw);
+      }
       if (body.cancel) {
         hw.status = 'todo'; hw.checkinAt = null; hw.checkinNote = ''; hw.checkinBy = ''; hw.images = [];
         hw.att = null; hw.meth = null; hw.eff = null; hw.qual = null; hw.quality = null;
         state.checkins = state.checkins.filter(c => c.homeworkId !== hw.id);
       } else {
-        hw.status = 'done'; hw.checkinAt = new Date().toISOString(); hw.checkinNote = body.note || ''; hw.checkinBy = body.by || ''; hw.duration = body.duration || null;
+        hw.status = 'done'; hw.checkinAt = body.day ? (body.day + 'T' + nowHM() + ':00.000Z') : new Date().toISOString(); hw.checkinNote = body.note || ''; hw.checkinBy = body.by || ''; hw.duration = body.duration || null;
         hw.qual = body.qual != null ? Number(body.qual) : (hw.qual || null);
         hw.att = null; hw.meth = null; hw.eff = null; hw.quality = null;
         if (Array.isArray(body.images)) hw.images = body.images;
@@ -2857,6 +2872,42 @@ function hwDayKey(x) {
   return x.assignDate || x.dueDate || '';
 }
 
+/** 两个日期相差的天数（b - a，按自然日，可负） */
+function hwDayDiff(a, b) {
+  if (!a || !b) return 0;
+  return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+}
+/** 作业在某天是否“出现”（需要展示）：非重复 = [布置日, 截止日] 闭区间；每天重复 = [开始, 结束] 闭区间 */
+function hwAppearsOn(x, d) {
+  if (x.repeat === 'daily') {
+    const s = x.startDate || x.assignDate;
+    if (!s || d < s) return false;
+    if (x.endDate && d > x.endDate) return false;
+    return true;
+  }
+  const a = x.assignDate || x.dueDate, b = x.dueDate || x.assignDate;
+  if (!a) return false;
+  return d >= a && d <= b;
+}
+/** 作业在某天是否已打卡完成 */
+function hwDoneOn(x, d) {
+  if (x.repeat === 'daily') return Array.isArray(x.doneDates) && x.doneDates.includes(d);
+  if (x.status !== 'done') return false;
+  const cd = (x.checkinAt || '').slice(0, 10) || (x.assignDate || '');
+  return cd === d;
+}
+/** 作业在某天是否“未完成待办”（出现且未打卡、且未整体逾期；逾期进顶部「逾期」组，不重复进当天） */
+function hwTodoOn(x, d) {
+  if (hwOverdue(x)) return false;
+  return hwAppearsOn(x, d) && !hwDoneOn(x, d);
+}
+/** 作业完成方式标签：当天 / 几天内 / 每天重复 */
+function hwModeOf(x) {
+  if (x.repeat === 'daily') return 'daily';
+  if (x.assignDate && x.dueDate && x.assignDate !== x.dueDate) return 'window';
+  return 'sameday';
+}
+
 /** 相对今天偏移 n 天的日期（n 负=过去，正=未来） */
 function dayOffset(n) {
   const d = new Date(today() + 'T00:00:00');
@@ -2870,18 +2921,19 @@ function hwDisplayDays() {
   return near;
 }
 
-/** 把作业切成有序分组（默认按昨天/今天/明天归组；点了其他日期那一并出现）。返回 { defs, hiddenN, pendN } */
+/** 把作业切成有序分组：逾期置顶；其余按「显示的天」归组——未完成的作业在截止日前每天都出现。返回 { defs, hiddenN, pendN } */
 function hwGroupDefs(hws) {
   const disp = hwDisplayDays();
-  const inSet = new Set(disp);
-  const ov = [], day = {}, nod = [];
+  const ov = [], dayTodo = {}, dayDone = {}, nod = [];
 
   (hws || []).forEach(x => {
-    const k = hwDayKey(x);
-    if (!k) { nod.push(x); return; }                 // 布置日、截止日都没填
-    if (hwOverdue(x)) { ov.push(x); return; }        // 先判逾期：已过截止时间的置顶提醒，不重复进当天组
-    if (inSet.has(k)) (day[k] = day[k] || []).push(x);
-    // 其余：不在默认三天、也不是当前选中日期 → 点日期条那天后才出现
+    if (!x.assignDate && !x.dueDate && x.repeat !== 'daily') { nod.push(x); return; }
+    if (hwOverdue(x)) { ov.push(x); return; }          // 整体逾期：置顶提醒，不重复进当天组
+    disp.forEach(d => {
+      if (!hwAppearsOn(x, d)) return;                  // 不在这一天的出现区间 → 不显示
+      if (hwDoneOn(x, d)) (dayDone[d] = dayDone[d] || []).push(x);
+      else (dayTodo[d] = dayTodo[d] || []).push(x);    // 未完成 → 截止日前每天都出现
+    });
   });
 
   const byKind = (a, b) => {
@@ -2903,17 +2955,18 @@ function hwGroupDefs(hws) {
     });
   }
   disp.forEach(d => {
-    const items = day[d] || [];
-    if (!items.length) return;                  // 当天没布置作业就不堆空组
+    const todo = dayTodo[d] || [], done = dayDone[d] || [];
+    const items = todo.concat(done);                  // 未完成在前、已完成在后
+    if (!items.length) return;                        // 当天没作业就不堆空组
     const rd = relDays(d);
-    const undone = items.filter(x => x.status !== 'done').length;
+    const undone = todo.length;
     pendN += undone;
     const icon = rd === 0 ? '📌' : rd === -1 ? '🌙' : rd === 1 ? '🌅' : '🗓';
     defs.push({
       key: 'd:' + d, tone: rd === 0 ? 'tdy' : '', defOpen: true,
-      title: `${icon} ${hwDayTitle(d)}布置`,
+      title: `${icon} ${hwDayTitle(d)}`,
       sub: `${items.length} 项${undone ? ` · 待完成 ${undone}` : ' · 全部完成'}`,
-      items: items.slice().sort(byKind)
+      items
     });
   });
   if (nod.length) {
@@ -2930,13 +2983,14 @@ function hwDateBarHTML(hws) {
   const inWeek = new Set(week);
   const pend = {}, done = {};
   (hws || []).forEach(x => {
-    // 与分组口径一致：按布置日统计；逾期的已进顶部置顶组，不重复计入当天
+    // 与分组口径一致：按「出现区间」统计；整体逾期的已进顶部置顶组，不重复计入当天
     // （否则「日期条显示 2 项、点进去只有 1 项」，数字对不上）
-    const k = hwDayKey(x);
-    if (!k || !inWeek.has(k)) return;
-    if (x.status === 'done') { done[k] = (done[k] || 0) + 1; return; }
     if (hwOverdue(x)) return;
-    pend[k] = (pend[k] || 0) + 1;
+    week.forEach(d => {
+      if (!hwAppearsOn(x, d)) return;
+      if (hwDoneOn(x, d)) done[d] = (done[d] || 0) + 1;
+      else pend[d] = (pend[d] || 0) + 1;
+    });
   });
   const chips = week.map(d => {
     const dt = new Date(d + 'T00:00:00');
@@ -2969,11 +3023,12 @@ function hwDateBarHTML(hws) {
 /** 单个分组：body 始终渲染（CSS 控制显隐），折叠时纯 classList 切换，不重渲染、不丢滚动位置 */
 function hwGroupHTML(g) {
   const open = hwGroupOpen(g);
+  const gd = g.key.startsWith('d:') ? g.key.slice(2) : '';
   return `<div class="hw-g ${g.tone || ''} ${open ? 'open' : ''}" id="${hwGid(g.key)}">
     <div class="hw-g-hd" onclick="hwToggleGroup('${g.key}')">
       <b>${g.title}</b><span class="muted">${g.sub}</span><span class="ar">▸</span>
     </div>
-    <div class="hw-g-bd">${g.items.map(x => hwItemHTML(x)).join('')}</div>
+    <div class="hw-g-bd">${g.items.map(x => hwItemHTML(x, false, gd)).join('')}</div>
   </div>`;
 }
 
@@ -3075,8 +3130,11 @@ function renderToday() {
   hwScrollDateBar();
 }
 
-function hwItemHTML(x, compact) {
-  const overdue = hwOverdue(x);
+function hwItemHTML(x, compact, d) {
+  d = d || today();
+  const daily = x.repeat === 'daily';
+  const done = hwDoneOn(x, d);
+  const overdue = !daily && hwOverdue(x);
   const c = x.courseId ? S.data.courses.find(y => y.id === x.courseId) : null;
   const src = c ? c.type : (x.source || 'main');
   // 关联的「哪天的什么课」：星期 + 上课时间 + 课程名（课包名）；未关联课程时退回布置日
@@ -3088,51 +3146,84 @@ function hwItemHTML(x, compact) {
   } else if (x.assignDate) {
     courseTx = `📅 ${WD[new Date(x.assignDate + 'T00:00:00').getDay()]}布置`;
   }
-  let due = '';
-  if (x.dueDate) {
-    const rd = relDays(x.dueDate);
-    const dayTx = rd === 0 ? '今天' : rd === 1 ? '明天' : rd === -1 ? '昨天' : fmtDate(x.dueDate);
-    due = `${dayTx} ${x.dueTime || ''}`;
+  // 完成方式标签 + 进度
+  let modeTag = '';
+  if (daily) {
+    const total = x.endDate ? hwDayDiff(x.startDate, x.endDate) + 1 : null;
+    const upTo = x.endDate ? x.endDate : d;
+    const doneN = (x.doneDates || []).filter(z => z <= upTo).length;
+    modeTag = `<span class="tag tg-daily">🔁 每天重复</span>` + (total ? `<span class="muted">第 ${doneN}/${total} 天</span>` : `<span class="muted">已打卡 ${doneN} 天</span>`);
+  } else if (hwModeOf(x) === 'window') {
+    const n = hwDayDiff(x.assignDate, x.dueDate) + 1;
+    modeTag = `<span class="tag tg-window">📅 ${n} 天内</span>`;
+  } else {
+    modeTag = `<span class="tag tg-sameday">📌 当天</span>`;
   }
-  return `<div class="hw s-${src} ${x.status === 'done' ? 'done' : ''} ${overdue ? 'overdue' : ''}">
-    <div class="hw-ck ${x.status === 'done' ? 'on' : ''} ${canEdit('checkin') ? `onclick="event.stopPropagation();toggleCheck('${x.id}')"` : 'ro'}>✓</div>
-    <div class="hw-main" onclick="hwDetail('${x.id}')">
+  let due = '';
+  if (daily && x.endDate) due = `至 ${fmtDate(x.endDate)}`;
+  else if (!daily && x.dueDate) {
+    const rd = relDays(x.dueDate);
+    due = `${rd === 0 ? '今天' : rd === 1 ? '明天' : rd === -1 ? '昨天' : fmtDate(x.dueDate)} ${x.dueTime || ''}`;
+  }
+  const ckOn = daily ? (Array.isArray(x.doneDates) && x.doneDates.includes(d)) : (x.status === 'done');
+  return `<div class="hw s-${src} ${done ? 'done' : ''} ${overdue ? 'overdue' : ''}">
+    <div class="hw-ck ${ckOn ? 'on' : ''} ${canEdit('checkin') ? `onclick="event.stopPropagation();toggleCheck('${x.id}','${d}')"` : 'ro'}>✓</div>
+    <div class="hw-main" onclick="hwDetail('${x.id}','${d}')">
       <div class="hw-t">${emojiOf(x.subject)} ${esc(x.title)}</div>
       <div class="hw-meta">
         ${courseTx ? `<span style="color:var(--tx2);font-weight:600">${courseTx}</span>` : ''}
-        <span class="tag ${TYPE_TAG[src]}">${TYPE_NAME[src]}</span>
+        ${modeTag}
         ${x.subject ? `<span>${esc(x.subject)}</span>` : ''}
         ${due ? `<span style="${overdue ? 'color:var(--warn);font-weight:700' : ''}">⏰ ${due}${overdue ? ' 已逾期' : ''}</span>` : ''}
-        ${x.status === 'done' && x.checkinAt ? `<span style="color:var(--ok)">✓ ${fmtDateTime(x.checkinAt)}打卡</span>` : ''}
+        ${daily && ckOn ? `<span style="color:var(--ok)">✓ ${fmtDate(d)} 已打卡</span>` : ''}
+        ${!daily && x.status === 'done' && x.checkinAt ? `<span style="color:var(--ok)">✓ ${fmtDateTime(x.checkinAt)}打卡</span>` : ''}
       </div>
       ${!compact && x.images && x.images.length ? `<div class="hw-imgs">${x.images.map(u => `<img src="${esc(u)}" onclick="event.stopPropagation();window.open('${esc(u)}')">`).join('')}</div>` : ''}
     </div></div>`;
 }
 
-async function toggleCheck(id) {
+async function toggleCheck(id, d) {
   const hw = S.data.homeworks.find(x => x.id === id);
   if (!hw) return;
   if (!canEdit('checkin')) { toast('当前身份没有打卡权限'); return; }
+  d = d || today();
   try {
-    if (hw.status === 'done') {
-      await api('/checkin/' + id, { method: 'POST', body: { cancel: true } });
-      toast('已取消打卡');
+    if (hw.repeat === 'daily') {
+      const was = Array.isArray(hw.doneDates) && hw.doneDates.includes(d);
+      await api('/checkin/' + id, { method: 'POST', body: { day: d, cancel: was } });
+      toast(was ? `已取消 ${fmtDate(d)} 打卡` : `${fmtDate(d)} 打卡成功 🎉`);
     } else {
-      await api('/checkin/' + id, { method: 'POST', body: { by: S.who } });
-      toast('打卡成功，真棒！🎉');
+      const was = hw.status === 'done';
+      await api('/checkin/' + id, { method: 'POST', body: { by: S.who, day: d, cancel: was } });
+      toast(was ? '已取消打卡' : '打卡成功，真棒！🎉');
     }
     await refresh();
   } catch (e) { toast(e.message); }
 }
 
 /* ---------- 作业详情 ---------- */
-function hwDetail(id) {
+function hwDetail(id, d) {
+  d = d || today();
   const x = S.data.homeworks.find(y => y.id === id);
   if (!x) return;
+  const daily = x.repeat === 'daily';
+  const done = daily ? hwDoneOn(x, d) : (x.status === 'done');
   const c = x.courseId ? S.data.courses.find(y => y.id === x.courseId) : null;
   // 关联的「哪天的什么课」：星期 + 上课时间 + 课程名（关联课包时显示课包名）
   const cTx = c ? `${WD[Number(c.weekday)]}${courseTime(c).start ? ' ' + courseTime(c).start : ''} ${(c.packageId ? (S.data.packages.find(z => z.id === c.packageId) || {}).name : '') || courseTitle(c)}` : '';
-  const doneCard = x.status === 'done' ? `<div class="card" style="margin-bottom:12px;border:1.5px solid rgba(37,198,133,.35)">
+  // 完成方式标签
+  let modeLine = '';
+  if (daily) {
+    const total = x.endDate ? hwDayDiff(x.startDate, x.endDate) + 1 : null;
+    const upTo = x.endDate ? x.endDate : d;
+    const doneN = (x.doneDates || []).filter(z => z <= upTo).length;
+    modeLine = `<span class="tag tg-daily">🔁 每天重复</span>` + (total ? `<span class="muted">进度 第 ${doneN}/${total} 天</span>` : `<span class="muted">已打卡 ${doneN} 天</span>`);
+  } else if (hwModeOf(x) === 'window') {
+    modeLine = `<span class="tag tg-window">📅 ${hwDayDiff(x.assignDate, x.dueDate) + 1} 天内完成</span>`;
+  } else {
+    modeLine = `<span class="tag tg-sameday">📌 当天完成</span>`;
+  }
+  const doneCard = !daily && done ? `<div class="card" style="margin-bottom:12px;border:1.5px solid rgba(37,198,133,.35)">
       <b style="color:var(--ok);font-size:14px">✅ 已完成打卡</b>
       <div class="muted" style="margin-top:4px">时间：${fmtDateTime(x.checkinAt)}${x.checkinBy ? ' · ' + esc(x.checkinBy) : ''}</div>
       ${x.duration ? `<div class="muted">用时：${x.duration} 分钟</div>` : ''}
@@ -3141,7 +3232,12 @@ function hwDetail(id) {
       ${x.checkinNote ? `<p class="tx2" style="margin-top:6px">${esc(x.checkinNote)}</p>` : ''}
       ${x.images && x.images.length ? `<div class="hw-imgs">${x.images.map(u => `<img src="${esc(u)}" onclick="window.open('${esc(u)}')">`).join('')}</div>` : ''}
     </div>` : '';
-  const todoForm = canEdit('checkin') ? `<div class="f2">${fInput('ckDur', '用时（分钟）', '', '选填', 'number')}</div>
+  const dailyDoneCard = daily && done ? `<div class="card" style="margin-bottom:12px;border:1.5px solid rgba(37,198,133,.35)">
+      <b style="color:var(--ok);font-size:14px">✅ ${fmtDate(d)} 已打卡</b>
+      ${x.images && x.images.length ? `<div class="hw-imgs">${x.images.map(u => `<img src="${esc(u)}" onclick="window.open('${esc(u)}')">`).join('')}</div>` : ''}
+    </div>` : '';
+  const dailyTodo = daily ? `<p class="muted">🔁 每天重复的作业，每天单独打卡。点下方按钮标记「${fmtDate(d)}」完成${done ? '（再次点击可取消）' : ''}。</p>` : '';
+  const todoForm = (!daily && canEdit('checkin')) ? `<div class="f2">${fInput('ckDur', '用时（分钟）', '', '选填', 'number')}</div>
     <div class="rate-edit">
       <div class="rate-line"><span class="rate-lab">完成质量</span>${starInput('qual', x.qual)}</div>
     </div>
@@ -3149,25 +3245,32 @@ function hwDetail(id) {
     <div class="f"><label>作业照片</label>
       <div id="ckImgs" class="hw-imgs"></div>
       <button class="btn ghost sm" style="margin-top:7px" onclick="addCkImg()">📷 拍照/选择图片</button></div>`
-    : `<p class="muted">当前身份仅可查看作业，打卡请切换到管理员或孩子的身份。</p>`;
+    : (!daily ? `<p class="muted">当前身份仅可查看作业，打卡请切换到管理员或孩子的身份。</p>` : '');
   const body = `
     <div class="card" style="margin-bottom:12px">
       <b style="font-size:16.5px">${emojiOf(x.subject)} ${esc(x.title)}</b>
       <div class="hw-meta" style="margin-top:6px">
-        <span class="tag ${TYPE_TAG[c ? c.type : (x.source || 'main')]}">${TYPE_NAME[c ? c.type : (x.source || 'main')]}</span>
+        ${modeLine}
         ${cTx ? `<span style="color:var(--tx2);font-weight:600">📚 ${esc(cTx)}</span>` : ''}
         <span>布置：${fmtDate(x.assignDate)}</span>
-        ${x.dueDate ? `<span>截止：${fmtDate(x.dueDate)} ${x.dueTime || ''}</span>` : ''}
+        ${daily && x.endDate ? `<span>至：${fmtDate(x.endDate)}</span>` : (x.dueDate ? `<span>截止：${fmtDate(x.dueDate)} ${x.dueTime || ''}</span>` : '')}
       </div>
       ${x.content ? `<p class="tx2" style="margin-top:9px;white-space:pre-wrap">${esc(x.content)}</p>` : ''}
     </div>
-    ${x.status === 'done' ? doneCard : todoForm}
+    ${daily ? (done ? dailyDoneCard : dailyTodo) : (done ? doneCard : todoForm)}
   `;
-  const foot = x.status === 'done'
-    ? (canEdit('checkin')
-        ? `<button class="btn ghost" onclick="toggleCheck('${x.id}');closeSheet()">取消打卡</button>${isAdmin() ? `<button class="btn warn" onclick="delHW('${x.id}')">删除</button>` : ''}`
-        : `<button class="btn ghost" onclick="closeSheet()">关闭</button>`)
-    : `${canEdit('homework') ? `<button class="btn ghost" onclick="hwForm('${x.id}')">编辑</button>` : ''}${canEdit('checkin') ? `<button class="btn ok" id="ckSave">✓ 完成打卡</button>` : (canEdit('homework') ? '' : `<button class="btn ghost" onclick="closeSheet()">关闭</button>`)}`;
+  let foot;
+  if (daily) {
+    foot = `<button class="btn ${done ? 'ghost' : 'ok'}" onclick="toggleCheck('${x.id}','${d}');closeSheet()">${done ? '取消 ' + fmtDate(d) + ' 打卡' : '✓ ' + fmtDate(d) + ' 打卡'}</button>`
+      + (canEdit('homework') ? `<button class="btn ghost" onclick="hwForm('${x.id}')">编辑</button>` : '')
+      + (isAdmin() ? `<button class="btn warn" onclick="delHW('${x.id}')">删除</button>` : '');
+  } else {
+    foot = done
+      ? (canEdit('checkin')
+          ? `<button class="btn ghost" onclick="toggleCheck('${x.id}');closeSheet()">取消打卡</button>${isAdmin() ? `<button class="btn warn" onclick="delHW('${x.id}')">删除</button>` : ''}`
+          : `<button class="btn ghost" onclick="closeSheet()">关闭</button>`)
+      : `${canEdit('homework') ? `<button class="btn ghost" onclick="hwForm('${x.id}')">编辑</button>` : ''}${canEdit('checkin') ? `<button class="btn ok" id="ckSave">✓ 完成打卡</button>` : (canEdit('homework') ? '' : `<button class="btn ghost" onclick="closeSheet()">关闭</button>`)}`;
+  }
   openSheet('作业详情', body, foot, () => {
     window._ckImgs = [];
     const btn = document.getElementById('ckSave');
@@ -3210,7 +3313,8 @@ function hwForm(id, preset) {
   const initType = presetCourse ? presetCourse.type : (x ? (x.source || 'main') : 'main');
   const d = Object.assign({
     assignDate: (preset && preset.day) || today(), dueDate: (preset && preset.day) || today(), dueTime: '21:00',
-    subject: presetCourse ? presetCourse.subject : '语文', status: 'todo'
+    subject: presetCourse ? presetCourse.subject : '语文', status: 'todo',
+    repeat: 'none', startDate: today(), endDate: '', doneDates: []
   }, preset || {}, x || {});
   const courses = gCourses().sort((a, b) => Number(a.weekday) - Number(b.weekday));
   // 按课程类型过滤“来自哪节课”，并随类型切换重排
@@ -3220,15 +3324,26 @@ function hwForm(id, preset) {
     })));
   const copts = renderHwCourseOpts(initType);
 
+  const rm = x ? (x.repeat === 'daily' ? 'daily' : (x.assignDate && x.dueDate && x.assignDate !== x.dueDate ? 'window' : 'sameday')) : 'sameday';
   const body = `
     ${fPick('hwType', '课程类型', [{ v: 'main', t: '🏫 学校正课' }, { v: 'extend', t: '🌇 延时课' }, { v: 'tutor', t: '🎯 课外辅导' }], initType)}
     ${fSelect('hwCourse', '来自哪节课', copts, (d.courseId && courses.find(c => c.id === d.courseId && c.type === initType)) ? d.courseId : '')}
     ${fSelect('hwSubject', '科目', subjOptions(), d.subject, true)}
     ${fInput('hwTitle', '作业内容', d.title, '如：口算100题 / 生字抄写2遍', 'text', true)}
     ${fArea('hwContent', '详细说明', d.content, '选填，如页码、要求')}
-    <div class="f2">${fInput('hwAssign', '布置日期', d.assignDate, '', 'date')}${fInput('hwDue', '截止日期', d.dueDate, '', 'date')}</div>
-    ${fInput('hwTime', '截止时间', d.dueTime, '', 'time')}
-    <p class="muted" style="margin-top:-4px">💡 到期前 ${S.data.settings.reminders.homeworkBefore} 分钟会自动提醒</p>`;
+    <div class="f"><label>完成方式</label>
+      <div id="hwMode" class="pick">${[
+        { v: 'sameday', t: '📌 当天完成' }, { v: 'window', t: '📅 几天内完成' }, { v: 'daily', t: '🔁 每天重复' }
+      ].map(o => `<button data-v="${o.v}" class="${rm === o.v ? 'on' : ''}" onclick="hwModePick('${o.v}')">${o.t}</button>`).join('')}</div>
+    </div>
+    <div id="hwRange" style="${rm === 'daily' ? 'display:none' : ''}">
+      <div class="f2">${fInput('hwAssign', '布置日期', d.assignDate, '', 'date')}${fInput('hwDue', '截止日期', d.dueDate, '', 'date')}</div>
+    </div>
+    <div id="hwDaily" style="${rm !== 'daily' ? 'display:none' : ''}">
+      <div class="f2">${fInput('hwStart', '开始日期', d.startDate || today(), '', 'date')}${fInput('hwEnd', '结束日期（选填）', d.endDate || '', '', 'date')}</div>
+      <p class="muted" style="margin-top:-4px">如 100 天打卡：开始填第一天、结束填第 100 天；不填则一直重复</p>
+    </div>
+    ${rm !== 'daily' ? fInput('hwTime', '截止时间', d.dueTime, '', 'time') + `<p class="muted" style="margin-top:-4px">💡 到期前 ${S.data.settings.reminders.homeworkBefore} 分钟会自动提醒</p>` : `<p class="muted">🔁 每天重复的作业不单独设提醒时间，每天都会出现在列表里</p>`}`;
   openSheet(x ? '编辑作业' : '记录作业',
     body,
     `<button class="btn ghost" onclick="closeSheet()">取消</button><button class="btn" id="hwSave">保存</button>`,
@@ -3256,14 +3371,26 @@ function hwForm(id, preset) {
         if (!val('hwTitle')) return toast('请填写作业内容');
         const c = S.data.courses.find(y => y.id === val('hwCourse'));
         const src = c ? c.type : (pickVal('#hwType') || 'main');
+        const mode = pickVal('#hwMode') || 'sameday';
         const body = {
           gradeId: gid(), courseId: val('hwCourse') || null,
           source: src,
           termId: (c ? c.termId : null) || curTerm() || null,
           subject: val('hwSubject'), title: val('hwTitle'), content: val('hwContent'),
-          assignDate: val('hwAssign'), dueDate: val('hwDue'), dueTime: val('hwTime'),
           status: d.status || 'todo'
         };
+        if (mode === 'daily') {
+          const sd = val('hwStart') || today();
+          body.repeat = 'daily'; body.startDate = sd; body.endDate = val('hwEnd') || null;
+          body.assignDate = sd; body.dueDate = null; body.dueTime = null;
+          body.doneDates = x ? (x.doneDates || []) : [];
+        } else {
+          body.repeat = 'none';
+          body.assignDate = val('hwAssign');
+          body.dueDate = (mode === 'sameday') ? val('hwAssign') : val('hwDue');
+          body.dueTime = val('hwTime');
+          body.startDate = null; body.endDate = null; body.doneDates = [];
+        }
         try {
           if (x) await api('/homeworks/' + id, { method: 'PUT', body });
           else await api('/homeworks', { method: 'POST', body: { ...body, images: [] } });
@@ -3271,6 +3398,14 @@ function hwForm(id, preset) {
         } catch (e) { toast(e.message); }
       };
     });
+}
+
+/** 完成方式切换：当天/几天内 → 显示布置+截止；每天重复 → 显示开始+结束 */
+function hwModePick(v) {
+  document.querySelectorAll('#hwMode button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  const range = document.getElementById('hwRange'), daily = document.getElementById('hwDaily');
+  if (range) range.style.display = (v === 'daily') ? 'none' : '';
+  if (daily) daily.style.display = (v === 'daily') ? '' : 'none';
 }
 
 /* ---------- 每日评价（态度/方法/努力，每天一次；默认显示今天，点/翻上方日期条可切到其他天）---------- */
