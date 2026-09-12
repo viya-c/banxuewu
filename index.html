@@ -12,6 +12,8 @@
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
 <style>
 /* ================= 星光伴学屋 · 活泼卡通风 ================= */
+/* 可分享版：本机纯本地运行，不连接仓库，隐藏「仓库配置」弹层 */
+#setup{display:none!important}
 :root{
   --main:#5B8CFF;      /* 学校正课 */
   --main-d:#3D6FE8;
@@ -493,9 +495,37 @@ img{max-width:100%;display:block}
   .rate-tip{font-size:10px}
 }
 
+/* 今日播报层（iOS 快捷指令自动化：每天定时打开 ?brief=1 即朗读/列出当日辅导课+作业） */
+.brief-mask{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;z-index:60;padding:16px}
+.brief-mask.on{display:flex}
+.brief-card{width:100%;max-width:460px;background:#fff;border-radius:20px;max-height:86vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.28)}
+.brief-top{display:flex;align-items:center;gap:8px;padding:16px 16px 6px;font-weight:800;font-size:17px}
+.brief-top .bd{margin-left:auto;color:#64748b;font-weight:600;font-size:13px}
+.brief-x{margin-left:8px;border:none;background:#f1f5f9;border-radius:50%;width:30px;height:30px;font-size:15px;color:#475569}
+.brief-body{padding:2px 16px 8px}
+.brief-empty{color:#94a3b8;padding:24px 0;text-align:center}
+.brief-sec{margin:12px 0}
+.brief-sec h4{margin:0 0 7px;font-size:14px;color:#5B8CFF;display:flex;align-items:center;gap:6px}
+.brief-sec.over h4{color:#ef4444}
+.brief-item{display:flex;align-items:center;gap:8px;padding:9px 11px;background:#f8fafc;border-radius:12px;margin-bottom:7px;font-size:14px}
+.brief-item.over{background:#fff1f0;border:1px solid #ffccc7}
+.brief-item .nm{font-weight:700}
+.brief-item .tm{margin-left:auto;color:#64748b;font-size:12px;white-space:nowrap}
+.brief-actions{display:flex;gap:10px;padding:12px 16px 18px}
+.brief-actions .btn{flex:1}
 </style>
 </head>
 <body>
+<div id="brief" class="brief-mask">
+  <div class="brief-card">
+    <div class="brief-top"><div>📣 今日播报</div><div class="bd" id="briefDate"></div><button class="brief-x" onclick="closeBrief()">✕</button></div>
+    <div class="brief-body" id="briefBody"></div>
+    <div class="brief-actions">
+      <button class="btn primary" onclick="speakBrief()">🔊 语音播报</button>
+      <button class="btn ghost" onclick="closeBrief()">进入应用</button>
+    </div>
+  </div>
+</div>
 <div id="setup" class="login" style="display:none">
   <div class="login-box" style="max-height:92vh;overflow:auto">
     <div class="lg">🔑</div>
@@ -673,12 +703,14 @@ function setHashParam(key, val) {
     history.replaceState(null, '', location.pathname + location.search + '#' + s);
   } catch (e) {}
 }
-window.__GITHUB = readGhCfg();
+window.__GITHUB = null;            // 可分享版：强制纯本地模式，不连接任何 GitHub 仓库
+window.__LOCAL = true;             // 启用内置 localStorage 后端，数据存本机浏览器，开箱即用
+try { localStorage.setItem('sm_token', 'local'); } catch (e) {}  // 免访问码自动登录，打开即用
 </script>
 <script>
 // 星光伴学屋 · 业务逻辑层（前端版，供 GitHub 后端适配层复用）
 // 与 deploy/cloudflare/logic.js 同源，仅去掉 export 以作为普通 <script> 全局加载。
-const APP_VERSION = '1.0.55';
+const APP_VERSION = '1.0.56';
 const BUILD_NO = '20260904b';
 const BUILD_TIME = '2026-09-05';
 const HOUSEHOLD_ID = 'default';
@@ -1081,6 +1113,7 @@ function defaultData() {
     },
     courses: [], packages: [], homeworks: [], exams: [], checkins: [], dailyRatings: [], points: [],
     changelog: [
+      { version: '1.0.56', date: '2026-09-12', items: ['★作业打卡默认只显示「今天 + 逾期未完成」：不再默认铺开昨天/明天。之前「周四登记、布置日设周五」的作业会在周四就出现（因为默认三天视图含明天），现已修复——未来才布置/到期的作业不会提前冒出来', '想看昨天或明天的作业？用顶部「周翻页日期条」点/翻到那天即可（作业与每日评价共用），首屏更聚焦', '★科目 ∪ 课程名称：正课/延时课里手动输入的课程名（如 思维/劳动/综合实践/心理/书法）现在自动并入「科目」下拉，记作业/成绩/课包时也能选到；仅并正课与延时课名称，课外辅导的班级名（如「奥数思维A班」）不污染科目。成绩/作业仍按各自实际 subject 分组，不受影响'] },
       { version: '1.0.55', date: '2026-09-07', items: ['★作业支持三种完成方式：📌 当天完成 / 📅 几天内完成 / 🔁 每天重复（如 100 天打卡）。记作业时在「完成方式」里选，对应显示布置+截止 或 开始+结束日期', '★未完成的作业在「截止日前每天都显示」：以前只显示在布置那天，现在没做完的作业会从布置日一直挂到截止日，每天打卡区都能看到，不会写着写着就找不到了', '★每天重复类作业按天独立打卡：每天单独勾选完成，卡片显示「第 N / 共 M 天」进度，漏打的天可回头补；未来的日子不能提前打', '逾期作业仍始终置顶在「⚠️ 逾期未完成」，不受「每天显示」影响；老作业（没设完成方式）自动按「当天/几天内」兼容，不会消失'] },
       { version: '1.0.54', date: '2026-09-05', items: ['★修正：每日评价恢复「可左右翻选日期」，且默认仍只显示今天——上次误把翻页导航整个删了，这次改对：每日评价 = 当天一张紧凑评价卡 + 上方共享周翻页器', '★共享周翻页条重新放在每日评价上方：点日期条上的某天、或 ‹ › 翻周，作业与每日评价一起切换到那天（这正是最初「两个区块共用一条翻页器」的诉求），不再各带一条、互相打架', '每日评价点哪天就显示哪天的态度/方法/努力评分并可保存；未来的日子置灰不可评，今天和过去的日子都能补录回看', '作业打卡行为不变：默认昨天/今天/明天、点其他日期才出现、点日期不跳转'] },
       { version: '1.0.53', date: '2026-09-05', items: ['★每日评价回归「只显示今天」：上一版的按周 7 天 / 最近三天列表虽然能回看，但占地方。现在每日评价只保留今天这一张紧凑评价卡（态度 / 方法 / 努力三星 + 保存按钮），首屏更短、更聚焦', '★周翻页日期条移回作业区正上方：因为每日评价不再按周翻动，那条 ‹上一周 / 下一周› 翻页器现在专心服务作业打卡（选日期、看任意过去/未来周），不再挂在每日评价头上造成「这条翻页好像跟上面没关系」的错觉', '作业打卡仍维持「默认昨天/今天/明天、点其他日期才出现」的紧凑逻辑，本次只动每日评价，作业区行为不变'] },
@@ -1476,6 +1509,280 @@ function reconcile(DB) {
   }
 
   window.__GH_API = { api: ghApi, syncOnce, startSync };
+})();
+
+/* 今日播报（iOS 快捷指令自动化：每天定时打开 ?brief=1 即朗读/列出当日辅导课+作业） */
+function renderBrief() {
+  const st = S.data; const body = document.getElementById('briefBody');
+  if (!st) { if (body) body.innerHTML = '<div class="brief-empty">暂无数据</div>'; return; }
+  const t = today();
+  const wd = new Date(t + 'T00:00:00').getDay();
+  const tut = [];
+  (st.packages || []).forEach(p => (p.sessions || []).forEach(s => {
+    if (s.plannedDate === t && s.status !== 'no' && s.status !== 'lv') tut.push({ nm: p.name, tm: (s.start || '') + (s.end ? '-' + s.end : '') });
+  }));
+  const sch = (st.courses || []).filter(c => Number(c.weekday) === wd).map(c => ({ nm: c.subject, tm: (c.startTime || '') + (c.endTime ? '-' + c.endTime : '') }));
+  const hwDue = (st.homeworks || []).filter(h => h.status === 'todo' && h.dueDate === t);
+  const hwOver = (st.homeworks || []).filter(h => h.status === 'todo' && h.dueDate && h.dueDate < t);
+  const dr = (st.dailyRatings || []).find(r => r.gradeId === (curGrade() && curGrade().id) && r.date === t);
+  let html = '', speak = '今天是' + fmtDate(t) + '。';
+  if (tut.length) { html += '<div class="brief-sec"><h4>🎯 辅导课（' + tut.length + '）</h4>'; tut.forEach(x => html += '<div class="brief-item"><span class="nm">' + esc(x.nm) + '</span><span class="tm">' + esc(x.tm) + '</span></div>'); html += '</div>'; speak += '辅导课' + tut.length + '节，'; tut.forEach(x => speak += x.nm + (x.tm ? ' ' + x.tm : '') + '，'); }
+  if (hwDue.length) { html += '<div class="brief-sec"><h4>📚 今天要交的作业（' + hwDue.length + '）</h4>'; hwDue.forEach(x => html += '<div class="brief-item"><span class="nm">' + esc(x.subject + '·' + x.title) + '</span><span class="tm">' + esc(x.dueTime || '截止') + '</span></div>'); html += '</div>'; speak += '今天要交作业' + hwDue.length + '项，'; hwDue.forEach(x => speak += x.title + '，'); }
+  if (hwOver.length) { html += '<div class="brief-sec over"><h4>⚠️ 逾期未完成（' + hwOver.length + '）</h4>'; hwOver.forEach(x => html += '<div class="brief-item over"><span class="nm">' + esc(x.subject + '·' + x.title) + '</span><span class="tm">' + esc(x.dueDate) + '</span></div>'); html += '</div>'; speak += '逾期未完成' + hwOver.length + '项，'; hwOver.forEach(x => speak += x.title + '，'); }
+  if (!html) html = '<div class="brief-empty">🎉 今天没有待办辅导课和作业</div>';
+  else if (sch.length) { html += '<div class="brief-sec"><h4>🏫 今日学校课（' + sch.length + '）</h4>'; sch.forEach(x => html += '<div class="brief-item"><span class="nm">' + esc(x.nm) + '</span><span class="tm">' + esc(x.tm) + '</span></div>'); html += '</div>'; }
+  if (dr) speak += '今日评价已记录。'; else speak += '今日评价还没记，记得评一下。';
+  body.innerHTML = html;
+  body.setAttribute('data-speak', speak);
+  const bd = document.getElementById('briefDate'); if (bd) bd.textContent = fmtDate(t);
+}
+function openBrief() { renderBrief(); document.getElementById('brief').classList.add('on'); }
+function closeBrief() {
+  const el = document.getElementById('brief'); if (el) el.classList.remove('on');
+  if (S.token && S.who) enterApp();
+  else if (S.token && !S.who) showWhoSelect();
+}
+function speakBrief() {
+  try {
+    const txt = document.getElementById('briefBody').getAttribute('data-speak');
+    if (!txt) return;
+    if (!window.speechSynthesis) { toast('当前浏览器不支持语音播报'); return; }
+    const u = new SpeechSynthesisUtterance(txt); u.lang = 'zh-CN'; u.rate = 1.02;
+    window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
+  } catch (e) { }
+}
+
+/* ================= 纯本地后端（可分享版） =================
+   与 GitHub 后端 ghApi 路由完全一致，唯一区别：
+   - 状态存在本机 localStorage（键 sm_local_state），不连任何服务器
+   - commit() 直接写 localStorage，无远端拉取 / 无多端同步（单设备）
+   - 首次打开自动载入示例数据（含 1 条逾期作业），开箱即用
+   api() 在 window.__LOCAL && window.__LOCAL_API 时优先走本实现。 */
+(function () {
+  if (!window.__LOCAL) return;
+  const LS_KEY = 'sm_local_state';
+  function localPut(state) { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
+  function localGet() { try { const s = localStorage.getItem(LS_KEY); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+
+  async function localApi(path, opt = {}) {
+    if (!S.data) {
+      let st = localGet();
+      if (!st || typeof st !== 'object' || Array.isArray(st)) {
+        st = defaultData();
+        const g0 = currentGrade(st).id;
+        seedDemo(st, g0);
+        // 可分享版：首次自动载入示例，含 1 条逾期作业，开箱即用
+        const D = n => { const x = new Date(); x.setDate(x.getDate() + n); return ymd(x); };
+        st.homeworks.push({ id: uid('x'), gradeId: g0, type: 'school', subject: '数学', title: '【示例·已逾期】订正昨天的错题', assignDate: D(-2), dueDate: D(-1), dueTime: '20:00', status: 'todo', courseId: null });
+        migrateGrades(st);
+      }
+      S.data = reconcile(st);
+      localPut(S.data);
+    }
+    const method = (opt.method || 'GET').toUpperCase();
+    const state = S.data;
+    const seg = path.replace(/^\//, '').split('/').filter(Boolean);
+    const body = opt.body || {};
+    const commit = async () => { localPut(S.data); };
+    const ok = (data) => ({ ok: true, data });
+
+    // ===== 以下路由与 GitHub 后端 ghApi 完全一致（仅 commit 改为写 localStorage）=====
+    if (seg[0] === 'meta') return { ok: true, version: APP_VERSION, build: BUILD_NO, familyName: state.family.name, childName: state.family.childName, childAvatar: state.family.childAvatar, needCode: !!state.family.accessCode };
+    if (seg[0] === 'commit' && method === 'POST') { await commit(); return ok({ ok: true }); }
+    if (seg[0] === 'login' && method === 'POST') {
+      const good = String(body.code || '').trim() === String(state.family.accessCode || '').trim();
+      if (!good) return { ok: false, error: '访问码不正确' };
+      return { ok: true, token: state.family.accessCode };
+    }
+    if (seg[0] === 'state' && method === 'GET') {
+      const pkgs = state.packages.map(p => ({ ...p, stats: packageStats(p) }));
+      return { ok: true, data: { ...state, packages: pkgs }, meta: { version: APP_VERSION, build: BUILD_NO, serverTime: new Date().toISOString() } };
+    }
+    if (seg[0] === 'family' && method === 'PUT') { Object.assign(state.family, body); await commit(); return ok(state.family); }
+    if (seg[0] === 'settings' && method === 'PUT') { state.settings = { ...state.settings, ...body, reminders: { ...state.settings.reminders, ...(body.reminders || {}) } }; await commit(); return ok(state.settings); }
+    if (seg[0] === 'grades' && seg[2] === 'activate' && method === 'POST') { state.grades.forEach(g => g.current = (g.id === seg[1])); await commit(); return ok(state.grades); }
+
+    // 课包子路由
+    if (seg[0] === 'packages' && seg[2] === 'records') {
+      const pkg = state.packages.find(p => p.id === seg[1]); if (!pkg) return { ok: false, error: '课包不存在' };
+      pkg.records = pkg.records || [];
+      if (method === 'POST') { pkg.records.unshift({ id: uid('r'), date: body.date || ymd(new Date()), type: body.type || 'consume', hours: Number(body.hours) || 1, note: body.note || '', createdAt: new Date().toISOString() }); await commit(); return ok({ ...pkg, stats: packageStats(pkg) }); }
+      if (method === 'DELETE' && seg[3]) { pkg.records = pkg.records.filter(r => r.id !== seg[3]); await commit(); return ok({ ...pkg, stats: packageStats(pkg) }); }
+    }
+    if (seg[0] === 'packages' && seg[2] === 'generate' && method === 'POST') { const pkg = state.packages.find(p => p.id === seg[1]); if (!pkg) return { ok: false, error: '课包不存在' }; const n = ensureSessions(pkg); await commit(); return ok({ ...pkg, stats: packageStats(pkg), generated: n }); }
+    if (seg[0] === 'packages' && seg[2] === 'reschedule-future' && method === 'POST') { const pkg = state.packages.find(p => p.id === seg[1]); if (!pkg) return { ok: false, error: '课包不存在' }; const moved = rescheduleFuture(pkg); await commit(); return ok({ ...pkg, stats: packageStats(pkg), moved }); }
+    if (seg[0] === 'packages' && seg[2] === 'autoend' && method === 'POST') { const pkg = state.packages.find(p => p.id === seg[1]); if (!pkg) return { ok: false, error: '课包不存在' }; const end = projectEndDate(pkg); if (!end) return { ok: false, error: '请先设置总课时与每周上课时间' }; pkg.endDate = end; const n = ensureSessions(pkg); await commit(); return ok({ ...pkg, stats: packageStats(pkg), endDate: end, generated: n }); }
+    if (seg[0] === 'packages' && seg[2] === 'sessions' && seg[4] === 'action' && method === 'POST') {
+      const pkg = state.packages.find(p => p.id === seg[1]); if (!pkg) return { ok: false, error: '课包不存在' };
+      const s = pkg.sessions.find(x => x.id === seg[3]); if (!s) return { ok: false, error: '课次不存在' };
+      const act = body.action;
+      const oldStatus = s.status;
+      if (act === 'attend') { s.status = 'at'; if (body.note !== undefined) s.note = body.note; }
+      else if (act === 'leave') { s.status = 'lv'; if (body.note !== undefined) s.note = body.note; }
+      else if (act === 'cancel') { s.status = 'no'; }
+      else if (act === 'undo') { s.status = 'sc'; s.rescheduled = false; if (s.origDate) { s.plannedDate = s.origDate; s.weekday = new Date(s.origDate + 'T00:00:00').getDay(); } s.origDate = null; }
+      else if (act === 'reschedule') {
+        if (!body.date) return { ok: false, error: '请选择调课后的日期' };
+        if (!s.origDate) s.origDate = s.plannedDate;
+        s.plannedDate = body.date; s.weekday = new Date(body.date + 'T00:00:00').getDay(); s.rescheduled = true; s.manual = true;
+        if (body.start) s.start = body.start; if (body.end) s.end = body.end;
+      }
+      else if (act === 'makeup' || act === 'postpone') {
+        let date = body.date; if (act === 'postpone' || !date) date = nextFreeSlot(pkg, s);
+        const wd = new Date(date + 'T00:00:00').getDay();
+        const slot = (pkg.schedule || []).find(x => Number(x.weekday) === wd) || { start: s.start, end: s.end };
+        pkg.sessions.push({ id: uid('s'), idx: pkg.sessions.length, plannedDate: date, weekday: wd, start: body.start || slot.start, end: body.end || slot.end, status: 'mk', rescheduled: false, makeupOf: s.id, hours: Number(s.hours) || Number(pkg.hoursEach) || 1, note: body.note || (act === 'postpone' ? '顺延补课' : '补课'), createdAt: new Date().toISOString() });
+        s.status = 'lv'; s.note = (s.note ? s.note + '；' : '') + '已安排补课';
+      }
+      else return { ok: false, error: '未知动作' };
+      const nowIso = new Date().toISOString();
+      if (!Array.isArray(s.acts)) s.acts = [];
+      s.acts.push({ at: nowIso, by: body.by || '', act, from: oldStatus, to: s.status });
+      if (s.acts.length > 10) s.acts = s.acts.slice(-10);
+      s.actAt = nowIso; s.actBy = body.by || ''; s.updatedAt = nowIso; await commit(); return ok({ ...pkg, stats: packageStats(pkg) });
+    }
+    if (seg[0] === 'packages' && seg[2] === 'sessions') {
+      const pkg = state.packages.find(p => p.id === seg[1]); if (!pkg) return { ok: false, error: '课包不存在' };
+      pkg.sessions = pkg.sessions || [];
+      if (seg[3]) {
+        const s = pkg.sessions.find(x => x.id === seg[3]); if (!s) return { ok: false, error: '课次不存在' };
+        if (method === 'PUT') { if (body.status) s.status = body.status; if (body.note !== undefined) s.note = body.note; if (body.plannedDate) { s.plannedDate = body.plannedDate; s.weekday = new Date(body.plannedDate + 'T00:00:00').getDay(); } if (body.start) s.start = body.start; if (body.end) s.end = body.end; if (body.hours != null) s.hours = Number(body.hours) || 1; s.updatedAt = new Date().toISOString(); await commit(); return ok({ ...pkg, stats: packageStats(pkg) }); }
+        if (method === 'DELETE') { pkg.sessions = pkg.sessions.filter(x => x.id !== seg[3]); await commit(); return ok({ ...pkg, stats: packageStats(pkg) }); }
+      }
+      if (method === 'POST') { pkg.sessions.push({ id: uid('s'), idx: pkg.sessions.length, plannedDate: body.plannedDate || ymd(new Date()), weekday: body.weekday != null ? Number(body.weekday) : new Date((body.plannedDate || ymd(new Date())) + 'T00:00:00').getDay(), start: body.start || (pkg.schedule[0] && pkg.schedule[0].start) || '', end: body.end || (pkg.schedule[0] && pkg.schedule[0].end) || '', status: body.status || 'sc', rescheduled: !!body.rescheduled, makeupOf: body.makeupOf || null, manual: !!body.manual, hours: body.hours != null ? Number(body.hours) : (Number(pkg.hoursEach) || 1), note: body.note || '', createdAt: new Date().toISOString() }); await commit(); return ok({ ...pkg, stats: packageStats(pkg) }); }
+    }
+
+    // 每日评价
+    if (seg[0] === 'daily-ratings' && method === 'POST') {
+      const gradeId = body.gradeId || (state.grades && (state.grades.find(g => g.current) || state.grades[0] || {}).id) || '';
+      const date = body.date || ymd(new Date()); if (!date) return { ok: false, error: '缺少日期' };
+      state.dailyRatings = state.dailyRatings || [];
+      let r = state.dailyRatings.find(x => x.gradeId === gradeId && x.date === date);
+      if (!r) { r = { id: uid('dr'), gradeId, date, createdAt: new Date().toISOString() }; state.dailyRatings.push(r); }
+      r.att = body.att != null ? Number(body.att) : (r.att || 0);
+      r.meth = body.meth != null ? Number(body.meth) : (r.meth || 0);
+      r.eff = body.eff != null ? Number(body.eff) : (r.eff || 0);
+      r.by = body.by || r.by || ''; r.updatedAt = new Date().toISOString();
+      await commit(); return ok(r);
+    }
+
+    // 作业打卡
+    if (seg[0] === 'checkin' && method === 'POST' && seg[1]) {
+      const hw = state.homeworks.find(h => h.id === seg[1]); if (!hw) return { ok: false, error: '作业不存在' };
+      if (hw.repeat === 'daily') {
+        hw.doneDates = Array.isArray(hw.doneDates) ? hw.doneDates : [];
+        const day = body.day || ymd(new Date());
+        if (body.cancel) hw.doneDates = hw.doneDates.filter(z => z !== day);
+        else if (!hw.doneDates.includes(day)) hw.doneDates.push(day);
+        hw.doneDates.sort();
+        await commit(); return ok(hw);
+      }
+      if (body.cancel) {
+        hw.status = 'todo'; hw.checkinAt = null; hw.checkinNote = ''; hw.checkinBy = ''; hw.images = [];
+        hw.att = null; hw.meth = null; hw.eff = null; hw.qual = null; hw.quality = null;
+        state.checkins = state.checkins.filter(c => c.homeworkId !== hw.id);
+      } else {
+        hw.status = 'done'; hw.checkinAt = body.day ? (body.day + 'T' + nowHM() + ':00.000Z') : new Date().toISOString(); hw.checkinNote = body.note || ''; hw.checkinBy = body.by || ''; hw.duration = body.duration || null;
+        hw.qual = body.qual != null ? Number(body.qual) : (hw.qual || null);
+        hw.att = null; hw.meth = null; hw.eff = null; hw.quality = null;
+        if (Array.isArray(body.images)) hw.images = body.images;
+        const stars = Number(hw.qual) || 0;
+        state.checkins = state.checkins.filter(c => c.homeworkId !== hw.id);
+        state.checkins.push({ id: uid('c'), homeworkId: hw.id, subject: hw.subject, date: hw.checkinAt, by: hw.checkinBy, stars, qual: hw.qual });
+      }
+      await commit(); return ok(hw);
+    }
+
+    // 图片上传（无 R2 → 直接回传 base64 dataURL）
+    if (seg[0] === 'upload' && method === 'POST') {
+      const m = /^data:(image\/(png|jpe?g|webp|gif));base64,(.+)$/i.exec(body.dataUrl || '');
+      if (!m) return { ok: false, error: '图片格式不支持' };
+      return ok({ url: body.dataUrl });
+    }
+
+    // 示例 / 清空 / 导出 / 导入
+    if (seg[0] === 'demo' && method === 'POST') { const g = currentGrade(state); if (!g) return { ok: false, error: '请先创建年级' }; seedDemo(state, g.id); migrateGrades(state); await commit(); return ok({ ok: true }); }
+    if (seg[0] === 'clear' && method === 'POST') { const g = currentGrade(state); if (!g) return { ok: false, error: '没有可清空的年级' }; state.courses = state.courses.filter(c => c.gradeId !== g.id); state.packages = state.packages.filter(p => p.gradeId !== g.id); state.homeworks = state.homeworks.filter(h => h.gradeId !== g.id); state.exams = state.exams.filter(e => e.gradeId !== g.id); state.points = (state.points || []).filter(p => p.gradeId !== g.id); await commit(); return ok({ ok: true }); }
+    if (seg[0] === 'export' && method === 'GET') return ok(state);
+    if (seg[0] === 'import' && method === 'POST') { if (!body || !Array.isArray(body.grades)) return { ok: false, error: '备份文件格式不正确' }; S.data = reconcile(body); S.data.version = APP_VERSION; await commit(); return ok({ ok: true }); }
+
+    // 课表批量写入
+    if (seg[0] === 'courses' && seg[1] === 'batch' && method === 'POST') {
+      const g = currentGrade(state);
+      if (!g) return { ok: false, error: '请先创建年级' };
+      let add = 0, upd = 0, del = 0;
+      if (body.clear) {
+        const before = state.courses.length;
+        state.courses = state.courses.filter(x => !(x.gradeId === g.id && (x.type === 'main' || x.type === 'extend')));
+        del = before - state.courses.length;
+      }
+      const ops = Array.isArray(body.ops) ? body.ops : [];
+      for (const o of ops) {
+        if (!o) continue;
+        const type = o.type === 'extend' ? 'extend' : 'main';
+        const wd = Number(o.weekday);
+        if (isNaN(wd)) continue;
+        const pi = Number(o.periodIdx) || 0;
+        const sub = o.subject ? String(o.subject).trim() : '';
+        const i = state.courses.findIndex(x => x.gradeId === g.id && x.type === type && Number(x.weekday) === wd && Number(x.periodIdx) === pi);
+        if (!sub) { if (i >= 0) { state.courses.splice(i, 1); del++; } continue; }
+        if (i >= 0) {
+          if (state.courses[i].subject !== sub || state.courses[i].name !== sub) {
+            state.courses[i] = { ...state.courses[i], subject: sub, name: sub, updatedAt: new Date().toISOString() };
+            upd++;
+          }
+        } else {
+          state.courses.push({
+            id: uid('c'), createdAt: new Date().toISOString(), gradeId: g.id, type,
+            subject: sub, name: sub, weekday: wd, periodIdx: pi, weekType: 'all'
+          });
+          add++;
+        }
+      }
+      const ups = Array.isArray(body.updates) ? body.updates : [];
+      for (const u of ups) {
+        if (!u || !u.id) continue;
+        const i = state.courses.findIndex(x => x.id === u.id && x.gradeId === g.id);
+        if (i < 0) continue;
+        const patch = {};
+        ['startTime', 'endTime', 'weekday', 'periodIdx', 'subject', 'name', 'teacher', 'location'].forEach(k => {
+          if (u[k] !== undefined) patch[k] = u[k];
+        });
+        if (!Object.keys(patch).length) continue;
+        state.courses[i] = { ...state.courses[i], ...patch, updatedAt: new Date().toISOString() };
+        upd++;
+      }
+      await commit();
+      return ok({ add, upd, del });
+    }
+
+    // 通用集合 CRUD（courses/packages/exams/members/grades/homeworks/checkins/dailyRatings）
+    const col = seg[0];
+    if (COLLECTIONS.includes(col)) {
+      const list = state[col];
+      if (method === 'GET') return ok(list);
+      if (method === 'POST') { const item = { id: uid(col[0]), createdAt: new Date().toISOString(), ...body }; if (col === 'packages') { item.records = item.records || []; ensureSessions(item); syncLinkedCourses(item, { subject: item.subject, name: item.name, teacher: item.teacher, org: item.org, teacherContact: item.teacherContact }); } if (col === 'grades') { if (item.current) state.grades.forEach(g => g.current = false); item.archived = !!item.archived; } list.push(item); await commit(); return ok(col === 'packages' ? { ...item, stats: packageStats(item) } : item); }
+      if (method === 'PUT' && seg[1]) {
+        const i = list.findIndex(x => x.id === seg[1]); if (i < 0) return { ok: false, error: '记录不存在' };
+        const oldSched = list[i].schedule;
+        const oldStart = list[i].startDate;
+        list[i] = { ...list[i], ...body, id: list[i].id, updatedAt: new Date().toISOString() };
+        if (col === 'grades' && body.current) state.grades.forEach(g => { if (g.id !== seg[1]) g.current = false; });
+        if (col === 'packages') {
+          rebuildPkgSessions(list[i]);
+          syncLinkedCourses(list[i], { subject: body.subject, name: body.name, teacher: body.teacher, org: body.org, teacherContact: body.teacherContact });
+        }
+        await commit(); return ok(col === 'packages' ? { ...list[i], stats: packageStats(list[i]) } : list[i]);
+      }
+      if (method === 'DELETE' && seg[1]) { const i = list.findIndex(x => x.id === seg[1]); if (i < 0) return { ok: false, error: '记录不存在' }; const [removed] = list.splice(i, 1); if (col === 'grades') { state.courses = state.courses.filter(c => c.gradeId !== removed.id); state.packages = state.packages.filter(p => p.gradeId !== removed.id); state.homeworks = state.homeworks.filter(h => h.gradeId !== removed.id); state.exams = state.exams.filter(e => e.gradeId !== removed.id); state.points = (state.points || []).filter(p => p.gradeId !== removed.id); if (removed.current && state.grades[0]) state.grades[0].current = true; } if (col === 'grades' || col === 'homeworks') { state.checkins = state.checkins.filter(c => state.homeworks.some(h => h.id === c.homeworkId)); } if (col === 'courses') state.homeworks.forEach(h => { if (h.courseId === removed.id) h.courseId = null; }); await commit(); return ok(removed); }
+    }
+
+    return { ok: false, error: '接口不存在：/api' + path };
+  }
+
+  // 纯本地：无远端，startSync 为空操作；syncOnce 亦空操作（数据本就在本机）
+  window.__LOCAL_API = { api: localApi, syncOnce: function () { }, startSync: function () { } };
+  console.log('[星光伴学屋·可分享版] 已启用纯本地模式（数据存本机浏览器）');
 })();
 
 /* 「保存中」指示器：拦截 window.__SAVING 的赋值，自动显示/隐藏顶栏徽标。
@@ -2056,7 +2363,17 @@ function fSwitch(id, title, sub, on) {
   return `<div class="sw"><div class="sw-t">${title}${sub ? `<small>${sub}</small>` : ''}</div>
     <div class="toggle ${on ? 'on' : ''}" id="${id}"></div></div>`;
 }
-const subjOptions = () => S.data.settings.subjects;
+/** 科目下拉选项 = 设置里的科目 ∪ 本年级「正课/延时课」的课程名称（取并集）。
+ *  这样手动输入的课程名（如 思维/劳动/综合实践/心理/书法）也能作为科目被选中、被统计。
+ *  仅扩展可选项，不改已存数据的 subject 字段；成绩/作业/打卡按实际 subject 分组不受影响。 */
+const subjOptions = () => {
+  const base = (S.data.settings && S.data.settings.subjects) || [];
+  const cs = gCourses() || [];
+  const names = cs
+    .filter(c => c.type === 'main' || c.type === 'extend')        // 只并「正课/延时课」名称，避免课外辅导的班级名（如「奥数思维A班」）污染科目
+    .map(c => (c.name || '').trim()).filter(Boolean);
+  return [...new Set([...base, ...names])];
+};
 
 /* ---------- 图片上传 ---------- */
 async function pickImages(max = 3) {
@@ -2914,11 +3231,13 @@ function dayOffset(n) {
   d.setDate(d.getDate() + n);
   return ymd(d);
 }
-/** 默认显示的天：昨天 / 今天 / 明天；若用户点了其他日期（HW_PICK），那一并出现。点日期不再跳转，只控制显隐 */
+/** 默认显示的天：只显示「今天」+ 周翻页选中的其他天。
+ *  规则：① 当天的作业（当天应做 / 当天到期 / 每天重复）② 截止日早于今天仍未完成的作业，统一置顶在「逾期未完成」组。
+ *  过去/未来的作业不再默认铺开；想看昨天或明天，用顶部周翻页日期条切换即可（作业与每日评价共用）。 */
 function hwDisplayDays() {
-  const near = [dayOffset(-1), dayOffset(0), dayOffset(1)];
-  if (HW_PICK && !near.includes(HW_PICK)) near.push(HW_PICK);
-  return near;
+  const disp = [dayOffset(0)];                                  // 今天
+  if (HW_PICK && HW_PICK !== today()) disp.push(HW_PICK);       // 周翻页选了别的天也显示
+  return disp;
 }
 
 /** 把作业切成有序分组：逾期置顶；其余按「显示的天」归组——未完成的作业在截止日前每天都出现。返回 { defs, hiddenN, pendN } */
@@ -3119,7 +3438,7 @@ function renderToday() {
   // 每日评价：只显示选中的那一天（默认今天）；点/翻上方日期条可切到其他天
   h += renderDailyRating();
 
-  // 作业：按布置日分组（默认昨天/今天/明天，点其他日期才出现）
+  // 作业：默认显示「今天」+ 逾期未完成；点顶部周翻页日期条可看其他天
   const pend = hws.filter(x => x.status !== 'done').length;
   h += `<div class="sec-h"><div class="sec-t">📝 作业打卡 <small>${pend} 项待完成</small></div>
     ${canEdit('homework') ? `<button class="btn xs" onclick="hwForm()">+ 记作业</button>` : ''}</div>`;
@@ -4815,6 +5134,11 @@ function renderMe() {
       <div><b class="ok">${doneRate}%</b>完成率</div>
     </div></div>`;
 
+  // 今日播报（iOS 快捷指令自动化入口，也可手动点开）
+  h += `<div class="card" style="margin-top:10px;display:flex;gap:10px;align-items:center">
+    <div class="col grow"><b style="font-size:15px">📣 今日播报</b><span class="muted">朗读 / 列出今天的辅导课与作业</span></div>
+    <button class="btn primary" onclick="openBrief()">查看</button></div>`;
+
   // 当前使用者
   h += `<div class="sec-h" data-fold="me-family"><div class="sec-t">👨‍👩‍👧 家庭成员 <small>${S.data.members.length} 人</small></div>
     ${canEdit('settings') ? `<button class="btn xs" onclick="memberForm()">+ 添加</button>` : ''}</div>
@@ -5554,7 +5878,11 @@ function applyRoleUI() {
     $('#loginTitle').textContent = (meta.childName || '宝贝') + ' 的星光伴学屋';
     if (S.token) {
       const res = await api('/state');
-      if (res.ok) { await loadState(); return showWhoSelect(); }
+      if (res.ok) {
+        await loadState();
+        if (/[?&]brief=1/.test(location.search)) { openBrief(); return; }
+        return showWhoSelect();
+      }
     }
   } catch (_) { }
   $('#login').style.display = 'flex';
